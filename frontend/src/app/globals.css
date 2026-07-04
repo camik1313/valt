@@ -1,0 +1,32 @@
+/* ============================================================
+   globals.css — styles that apply to the WHOLE app.
+   The three @tailwind lines below inject Tailwind's generated
+   utility classes. Everything else here is minimal base styling.
+   ============================================================ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base page defaults. Tailwind resets most things; we set the
+   background and default text color/font here so every page inherits them. */
+@layer base {
+  html {
+    scroll-behavior: smooth; /* smooth scrolling when nav links jump to sections */
+  }
+  body {
+    @apply bg-surface text-ink font-body antialiased;
+  }
+}
+
+/* Respect users who prefer reduced motion (accessibility requirement). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

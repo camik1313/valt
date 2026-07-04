@@ -1,0 +1,23 @@
+# ---- Web framework ----
+fastapi==0.111.1          # the API framework (defines endpoints)
+uvicorn[standard]==0.30.3 # the server that actually runs FastAPI
+python-multipart==0.0.9   # lets FastAPI receive uploaded files (video)
+
+# ---- Data / math ----
+numpy==1.26.4             # fast numerical arrays (used in metric math)
+pandas==2.2.2             # tabular data (used for CSV export)
+
+# ---- Settings ----
+pydantic==2.8.2           # data validation + our schemas
+pydantic-settings==2.3.4  # loads settings from environment variables
+
+# ---- NOTE ----
+# MediaPipe and OpenCV are intentionally NOT here yet. We add them in
+# Stage 7 when we integrate the real computer-vision pipeline:
+#   mediapipe==0.10.14
+#   opencv-python-headless==4.10.0.84
+# Keeping them out for now makes the backend fast and easy to install.
+
+# ---- Testing ----
+pytest==8.3.2             # runs our automated tests
+httpx==0.27.0             # test client for calling the API in tests

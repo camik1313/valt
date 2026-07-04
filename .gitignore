@@ -1,0 +1,27 @@
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Node / frontend
+node_modules/
+.next/
+out/
+.vercel/
+
+# Python / backend
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Runtime data
+backend/data/uploads/*
+backend/data/analyses/*
+!backend/data/uploads/.gitkeep
+!backend/data/analyses/.gitkeep
+
+# OS / editor junk
+.DS_Store
+.vscode/
+*.swp

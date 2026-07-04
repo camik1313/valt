@@ -1,0 +1,13 @@
+# Render deployment config. When you connect this repo to Render,
+# it reads this file to know how to build and start your backend.
+services:
+  - type: web
+    name: acl-motioncheck-backend
+    runtime: python
+    # 'rootDir' points Render at the backend/ subfolder of the monorepo.
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ALLOWED_ORIGINS
+        sync: false   # you set this in the Render dashboard (your Vercel URL)
