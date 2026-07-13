@@ -2,10 +2,9 @@
 # analyze.py — the POST /analyze endpoint.
 #
 # Takes an upload_id (from /upload) plus an athlete name, builds an
-# Analysis (mock metrics for now), saves it, and returns it.
+# Analysis via the report service, saves it, and returns it.
 #
-# When the real CV pipeline arrives, NONE of this changes — only
-# the internals of report_service.build_analysis() do.
+# The route stays thin: it does HTTP, then delegates to the service.
 # ============================================================
 
 from fastapi import APIRouter
@@ -18,14 +17,15 @@ router = APIRouter(tags=["analyze"])
 
 @router.post("/analyze", response_model=Analysis)
 async def analyze_video(request: AnalyzeRequest):
-    # Build the analysis (mock for now).
+    # Build the analysis. We pass the upload id as the filename for now;
+    # in a later stage we'll look up the real saved filename.
     analysis = report_service.build_analysis(
         upload_id=request.upload_id,
-        filename=f"{request.upload_id}",  # we only stored by id for now
         athlete_name=request.athlete_name,
+        video_filename=f"{request.upload_id}.mp4",
     )
 
-    # Persist it so it shows up in history and can be reopened by id.
+    # Persist it so it appears in history and can be reopened by id.
     storage.save_analysis(analysis)
 
     return analysis
