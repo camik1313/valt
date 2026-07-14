@@ -15,12 +15,19 @@ export type Metric = {
   status: "ok" | "watch" | "flag"; // research-informed banding
 };
 
+// Which camera angle a video was filmed from. This determines which
+// measurements are scientifically valid — see backend cv/pipeline.py.
+//   front -> frontal plane  -> knee valgus, lateral trunk lean
+//   side  -> sagittal plane -> knee/hip flexion, forward trunk lean
+export type CameraView = "front" | "side";
+
 // A single completed analysis of one video.
 export type Analysis = {
   id: string;
   athleteName: string;
   createdAt: string;      // ISO date string
   videoFilename: string;
+  view: CameraView;       // which plane was measured
   metrics: Metric[];
   summary: string;        // plain-language overview
 };

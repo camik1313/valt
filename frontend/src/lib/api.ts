@@ -10,7 +10,7 @@
 // without changing code.
 // ============================================================
 
-import { Analysis } from "./types";
+import { Analysis, CameraView } from "./types";
 
 // Read the backend URL from the environment, with a sensible fallback.
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -62,12 +62,13 @@ export async function uploadVideo(file: File): Promise<UploadResult> {
 // ---- POST /analyze : run analysis on an uploaded video ----
 export async function analyzeVideo(
   uploadId: string,
-  athleteName: string
+  athleteName: string,
+  view: CameraView
 ): Promise<Analysis> {
   const res = await fetch(`${API_URL}/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ uploadId, athleteName }),
+    body: JSON.stringify({ uploadId, athleteName, view }),
   });
   return handle<Analysis>(res);
 }

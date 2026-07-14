@@ -11,9 +11,12 @@ pandas==2.2.3
 pydantic==2.10.4
 pydantic-settings==2.7.0
 
-# NOTE: MediaPipe and OpenCV get added in Stage 7:
-#   mediapipe
-#   opencv-python-headless
+# Computer vision (Stage 7)
+# mediapipe pinned to 0.10.14 — the version verified working on
+# Apple Silicon + Python 3.12. Newer versions have had issues loading
+# the `solutions` module on some setups.
+mediapipe==0.10.14
+opencv-python==4.10.0.84
 
 # Testing
 pytest==8.3.4

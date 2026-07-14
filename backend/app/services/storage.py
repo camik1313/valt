@@ -96,3 +96,20 @@ def new_analysis_id() -> str:
 def now_iso() -> str:
     """Current time as an ISO string, e.g. '2026-07-04T12:00:00'."""
     return datetime.now().isoformat(timespec="seconds")
+
+
+def find_upload_path(upload_id: str) -> str | None:
+    """
+    Find the saved video file for an upload_id.
+
+    We saved it as "<upload_id><ext>", but we don't know the extension
+    up front, so we scan the upload folder for a matching prefix.
+    Returns the full path, or None if not found.
+    """
+    _ensure_dirs()
+    if not os.path.isdir(settings.upload_dir):
+        return None
+    for filename in os.listdir(settings.upload_dir):
+        if filename.startswith(upload_id):
+            return os.path.join(settings.upload_dir, filename)
+    return None

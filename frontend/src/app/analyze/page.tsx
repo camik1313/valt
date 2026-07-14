@@ -17,7 +17,7 @@ import Link from "next/link";
 import VideoUploader from "@/components/upload/VideoUploader";
 import ProcessingStatus from "@/components/upload/ProcessingStatus";
 import Button from "@/components/ui/Button";
-import { ProcessingStage } from "@/lib/types";
+import { ProcessingStage, CameraView } from "@/lib/types";
 import { uploadVideo, analyzeVideo } from "@/lib/api";
 
 export default function AnalyzePage() {
@@ -25,6 +25,9 @@ export default function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
   const [athleteName, setAthleteName] = useState("Athlete");
+  // Which camera angle this clip was filmed from. This decides which
+  // measurements are scientifically valid (frontal vs sagittal plane).
+  const [view, setView] = useState<CameraView>("front");
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -65,7 +68,7 @@ export default function AnalyzePage() {
 
       // 2) PROCESSING. Ask the backend to analyze the uploaded video.
       setStage("processing");
-      const analysis = await analyzeVideo(upload.uploadId, athleteName); // POST /analyze
+      const analysis = await analyzeVideo(upload.uploadId, athleteName, view); // POST /analyze
 
       // 3) COMPLETE. Remember the id so we can link to the real report.
       setAnalysisId(analysis.id);
@@ -134,6 +137,43 @@ export default function AnalyzePage() {
                   placeholder="e.g. Jordan Lee"
                 />
               </label>
+
+              {/* Camera view — this is a SCIENTIFIC choice, not cosmetic.
+                  A camera can only measure motion in the plane it faces. */}
+              <fieldset className="mt-5">
+                <legend className="text-sm font-medium text-ink">
+                  Camera angle
+                </legend>
+                <p className="mt-1 text-xs text-muted">
+                  Where was the camera relative to the athlete? This determines
+                  which measurements are valid.
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      { key: "front", title: "Front-on", sub: "Knee valgus, lateral lean" },
+                      { key: "side", title: "Side-on", sub: "Knee & hip flexion" },
+                    ] as { key: CameraView; title: string; sub: string }[]
+                  ).map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setView(opt.key)}
+                      className={[
+                        "rounded-lg border p-3 text-left transition-all",
+                        view === opt.key
+                          ? "border-track bg-track-soft"
+                          : "border-line bg-white hover:border-track/50",
+                      ].join(" ")}
+                    >
+                      <span className="block font-display text-sm font-semibold text-ink">
+                        {opt.title}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted">{opt.sub}</span>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
 
               <div className="mt-6 flex gap-3">
                 <Button onClick={startAnalysis} variant="primary" className="flex-1">

@@ -1,25 +1,37 @@
 # ============================================================
 # report_service.py — turns a video into a finished Analysis.
 #
-# CHANGED IN STAGE 6: this no longer generates numbers itself. It now
-# CALLS THE CV PIPELINE (cv/mock_pipeline) to get raw measurements, then
-# does the "meaning" work on top: banding each measurement into ok/watch/
-# flag and writing the plain-language summary.
+# Division of labor (unchanged):
+#   cv/pipeline    -> RAW measurements (the science)
+#   report_service -> INTERPRETATION (banding, summary, assembling schema)
 #
-# Division of labor:
-#   cv/ pipeline  -> RAW measurements (the science)
-#   report_service -> INTERPRETATION (banding + summary + assembling schema)
-#
-# When the real pipeline lands in Stage 7, only the import below changes
-# (mock_pipeline -> real pipeline). Everything in this file stays the same.
+# VIEW-AWARE: the pipeline only returns measurements valid for the camera
+# angle, so this file just labels and bands whatever it gets back. No
+# averaging across legs — asymmetry is the point, and averaging hides it.
 # ============================================================
 
 from app.models.schemas import Analysis, Metric
 from app.services import storage
-from app.cv import mock_pipeline
+from app.cv import pipeline, mock_pipeline
 
-# Human-friendly labels + units for each measurement key.
+# Set False to force the mock pipeline (instant, fake numbers).
+USE_REAL_PIPELINE = True
+
+# Human-friendly labels + units, keyed by measurement name.
 LABELS = {
+    # Frontal plane (front view)
+    "knee_valgus_left": ("Knee valgus — left", "deg"),
+    "knee_valgus_right": ("Knee valgus — right", "deg"),
+    "valgus_asymmetry": ("Valgus asymmetry", "%"),
+    "trunk_lean_lateral": ("Trunk lean (lateral)", "deg"),
+    # Sagittal plane (side view)
+    "knee_flexion_left": ("Knee flexion — left", "deg"),
+    "knee_flexion_right": ("Knee flexion — right", "deg"),
+    "hip_flexion_left": ("Hip flexion — left", "deg"),
+    "hip_flexion_right": ("Hip flexion — right", "deg"),
+    "flexion_asymmetry": ("Flexion asymmetry", "%"),
+    "trunk_lean_forward": ("Trunk lean (forward)", "deg"),
+    # Mock-only keys (fallback path)
     "knee_flexion": ("Knee flexion", "deg"),
     "knee_valgus": ("Dynamic knee valgus", "deg"),
     "trunk_lean": ("Trunk lean", "deg"),
@@ -27,22 +39,35 @@ LABELS = {
     "hip_flexion": ("Hip flexion", "deg"),
 }
 
-# ILLUSTRATIVE banding thresholds (watch_at, flag_at). Higher = more concern.
-# NOTE: these are placeholders, NOT clinical cutoffs. Cited, evidence-based
-# thresholds arrive with the real pipeline in Stage 7.
+# Display order. We show whatever exists, in this order.
+DISPLAY_ORDER = [
+    "knee_valgus_left", "knee_valgus_right", "valgus_asymmetry", "trunk_lean_lateral",
+    "knee_flexion_left", "knee_flexion_right", "flexion_asymmetry",
+    "hip_flexion_left", "hip_flexion_right", "trunk_lean_forward",
+    "knee_flexion", "knee_valgus", "trunk_lean", "asymmetry", "hip_flexion",
+]
+
+# ILLUSTRATIVE banding thresholds (watch_at, flag_at) applied to the
+# ABSOLUTE value. PLACEHOLDERS — Part 5 replaces these with values cited
+# from ACL injury-prevention literature.
 THRESHOLDS = {
+    "knee_valgus_left": (10, 15),
+    "knee_valgus_right": (10, 15),
     "knee_valgus": (10, 15),
+    "trunk_lean_lateral": (10, 15),
+    "trunk_lean_forward": (30, 45),
     "trunk_lean": (10, 15),
+    "valgus_asymmetry": (25, 50),
+    "flexion_asymmetry": (10, 15),
     "asymmetry": (10, 15),
 }
 
 
 def _band(key: str, value: float) -> str:
     """Convert a raw measurement into ok / watch / flag."""
-    # knee_flexion is the opposite direction: LOW flexion (stiff landing)
-    # is the concern, so we band on how far below a soft-landing target it is.
-    if key == "knee_flexion":
-        deficit = 70 - value  # how many degrees under a ~70° soft landing
+    # Flexion is inverted: LOW flexion (a stiff landing) is the concern.
+    if key.startswith("knee_flexion") or key.startswith("hip_flexion"):
+        deficit = 70 - value  # degrees under a ~70 deg soft landing
         if deficit >= 15:
             return "flag"
         if deficit >= 8:
@@ -51,59 +76,99 @@ def _band(key: str, value: float) -> str:
 
     if key in THRESHOLDS:
         watch_at, flag_at = THRESHOLDS[key]
-        if value >= flag_at:
+        # Valgus is signed: negative = varus. We band on MAGNITUDE, since
+        # deviation in either direction is worth noticing.
+        v = abs(value)
+        if v >= flag_at:
             return "flag"
-        if value >= watch_at:
+        if v >= watch_at:
             return "watch"
         return "ok"
 
-    return "ok"  # hip_flexion and anything else: neutral for now
+    return "ok"
 
 
-def build_analysis(upload_id: str, athlete_name: str, video_filename: str) -> Analysis:
+def build_analysis(
+    upload_id: str,
+    athlete_name: str,
+    video_filename: str,
+    video_path: str | None = None,
+    view: str = "front",
+) -> Analysis:
     """
-    Run the pipeline and assemble a full Analysis object.
-    """
-    # 1) Get raw measurements from the CV pipeline (mock for now).
-    result = mock_pipeline.run_pipeline(seed=upload_id)
+    Run the pipeline on a video and assemble a full Analysis.
 
-    # 2) Turn each raw number into a labeled, banded Metric.
-    metrics: list[Metric] = []
-    for key in mock_pipeline.MEASUREMENT_KEYS:
+    Falls back to the mock if the real pipeline fails, clearly labeled so
+    simulated numbers can never be mistaken for measurements.
+    """
+    used_mock = False
+    fallback_reason = ""
+
+    # ---- 1) Raw measurements ----
+    if USE_REAL_PIPELINE and video_path:
+        try:
+            result = pipeline.run_pipeline(seed=upload_id, video_path=video_path, view=view)
+        except Exception as exc:
+            result = mock_pipeline.run_pipeline(seed=upload_id)
+            used_mock = True
+            fallback_reason = str(exc)
+    else:
+        result = mock_pipeline.run_pipeline(seed=upload_id)
+        used_mock = True
+        fallback_reason = "Real pipeline disabled."
+
+    # ---- 2) Label and band ----
+    metrics_list: list[Metric] = []
+    for key in DISPLAY_ORDER:
+        if key not in result.measurements:
+            continue
         value = result.measurements[key]
-        label, unit = LABELS[key]
-        metrics.append(
+        label, unit = LABELS.get(key, (key, ""))
+        metrics_list.append(
             Metric(key=key, label=label, value=value, unit=unit, status=_band(key, value))
         )
 
-    # 3) Write a plain-language summary based on what got flagged.
-    flags = [m.label for m in metrics if m.status == "flag"]
-    watches = [m.label for m in metrics if m.status == "watch"]
+    # ---- 3) Summary ----
+    flags = [m.label for m in metrics_list if m.status == "flag"]
+    watches = [m.label for m in metrics_list if m.status == "watch"]
+    plane = "frontal plane" if view == "front" else "sagittal plane"
 
-    if flags:
+    if used_mock:
         summary = (
-            f"Analysis complete for {athlete_name}. The following measurements stood "
-            f"out and may be worth a closer look: {', '.join(flags)}. "
-            f"These are movement observations from an automated tool, not a diagnosis."
+            f"⚠️ SIMULATED RESULT for {athlete_name}. The video could not be "
+            f"analyzed ({fallback_reason}), so these numbers are placeholders, "
+            f"not measurements. Re-film with the whole body in frame."
+        )
+    elif flags:
+        summary = (
+            f"Analysis complete for {athlete_name} ({view} view, {plane}). "
+            f"Measured at the landing frame. The following stood out and may be "
+            f"worth a closer look: {', '.join(flags)}. These are movement "
+            f"observations from an automated tool, not a diagnosis."
         )
     elif watches:
         summary = (
-            f"Analysis complete for {athlete_name}. Most patterns look typical; "
-            f"{', '.join(watches)} sat near the borderline and could be worth monitoring. "
-            f"These are movement observations, not a diagnosis."
+            f"Analysis complete for {athlete_name} ({view} view, {plane}). "
+            f"Most patterns look typical; {', '.join(watches)} sat near the "
+            f"borderline. These are movement observations, not a diagnosis."
         )
     else:
         summary = (
-            f"Analysis complete for {athlete_name}. All measured patterns fell within "
-            f"typical ranges for this landing. These are movement observations, not a diagnosis."
+            f"Analysis complete for {athlete_name} ({view} view, {plane}). "
+            f"All measured patterns fell within typical ranges for this landing. "
+            f"These are movement observations, not a diagnosis."
         )
 
-    # 4) Assemble and return the Analysis.
+    if not used_mock and result.notes:
+        summary += " " + " ".join(result.notes)
+
+    # ---- 4) Assemble ----
     return Analysis(
         id=storage.new_analysis_id(),
         athlete_name=athlete_name,
         created_at=storage.now_iso(),
         video_filename=video_filename,
-        metrics=metrics,
+        view=view,
+        metrics=metrics_list,
         summary=summary,
     )

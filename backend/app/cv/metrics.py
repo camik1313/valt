@@ -150,3 +150,70 @@ def asymmetry_percent(left_value: float, right_value: float) -> float:
     if mean == 0:
         return 0.0
     return abs(left_value - right_value) / mean * 100.0
+
+
+# ---- Signed valgus (frontal plane) ---------------------------
+
+def knee_valgus_signed(hip: Point, knee: Point, ankle: Point, side: str) -> float:
+    """
+    Dynamic knee valgus in degrees, WITH DIRECTION.
+
+        positive = VALGUS  (knee caves toward the body's midline — "knock-kneed")
+        negative = VARUS   (knee bows away from the midline — "bow-legged")
+        ~0       = knee tracks straight over the ankle
+
+    ONLY MEANINGFUL FROM A FRONT-ON VIEW. Valgus is a frontal-plane motion;
+    from a side view this number is measuring knee flexion instead and is
+    scientifically meaningless. The caller must know its camera view.
+
+    HOW IT WORKS:
+      1. The MAGNITUDE is the 2D deviation of the hip-knee-ankle angle from
+         straight (180 deg) — the standard Frontal Plane Projection Angle idea.
+      2. The DIRECTION comes from comparing the knee's x-position against the
+         straight line from hip to ankle. If the knee sits toward the midline,
+         that's valgus; away from it, varus. The plain angle cannot tell these
+         apart, which is why we compute the sign separately.
+
+    Args:
+        side: "left" or "right" — the SUBJECT'S anatomical side. Needed because
+            in a front-on view the subject's LEFT appears on the image's RIGHT,
+            so "toward the midline" is a different x-direction for each leg.
+
+    NOTE: assumes an un-mirrored front view. Phone selfie cameras mirror the
+    image, which would swap left and right.
+    """
+    magnitude = 180.0 - angle_at_joint(hip, knee, ankle)
+
+    hip_x, hip_y = hip
+    knee_x, knee_y = knee
+    ankle_x, ankle_y = ankle
+
+    # Where would the knee be if the leg were perfectly straight? Find the
+    # point on the hip->ankle line at the knee's height.
+    if abs(ankle_y - hip_y) < 1e-9:
+        return 0.0  # degenerate: hip and ankle at the same height
+    t = (knee_y - hip_y) / (ankle_y - hip_y)
+    line_x = hip_x + t * (ankle_x - hip_x)
+
+    # How far, horizontally, is the real knee from that straight-leg line?
+    # Positive means the knee sits to the RIGHT of the line in the image.
+    horizontal_deviation = knee_x - line_x
+
+    # Convert "image right/left" into "medial/lateral" for this leg.
+    # Front-on: subject's LEFT leg appears on the image RIGHT, so medial
+    # (toward midline) means moving LEFT in the image = negative deviation.
+    if side.lower() == "left":
+        medial = -horizontal_deviation
+    else:
+        medial = horizontal_deviation
+
+    return magnitude if medial >= 0 else -magnitude
+
+
+def lateral_trunk_lean(shoulder_mid: Point, hip_mid: Point) -> float:
+    """
+    Sideways trunk lean, from a FRONT view. Same geometry as trunk_lean();
+    named separately so the calling code is explicit about which plane it
+    is measuring. From a front camera, trunk_lean() captures LATERAL tilt.
+    """
+    return trunk_lean(shoulder_mid, hip_mid)

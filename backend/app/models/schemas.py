@@ -42,6 +42,7 @@ class Analysis(CamelModel):
     athlete_name: str
     created_at: str          # ISO timestamp, e.g. "2026-07-04T12:00:00"
     video_filename: str
+    view: str = "front"      # "front" or "side" — which plane was measured
     metrics: list[Metric]
     summary: str             # plain-language overview
 
@@ -57,6 +58,9 @@ class UploadResponse(CamelModel):
 class AnalyzeRequest(CamelModel):
     upload_id: str
     athlete_name: str = "Athlete"   # optional; defaults if not provided
+    # Which camera angle the video was filmed from. This determines which
+    # measurements are scientifically valid (see cv/pipeline.py).
+    view: str = "front"
 
 
 # ---- A short entry for the history list ----
