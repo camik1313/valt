@@ -20,9 +20,10 @@ USE_REAL_PIPELINE = True
 # Human-friendly labels + units, keyed by measurement name.
 LABELS = {
     # Frontal plane (front view)
-    "knee_valgus_left": ("Knee valgus — left", "deg"),
-    "knee_valgus_right": ("Knee valgus — right", "deg"),
+    "knee_valgus_left": ("Knee valgus — left", "HW"),
+    "knee_valgus_right": ("Knee valgus — right", "HW"),
     "valgus_asymmetry": ("Valgus asymmetry", "%"),
+    "kasr": ("Knee/ankle separation", "ratio"),
     "trunk_lean_lateral": ("Trunk lean (lateral)", "deg"),
     # Sagittal plane (side view)
     "knee_flexion_left": ("Knee flexion — left", "deg"),
@@ -41,7 +42,7 @@ LABELS = {
 
 # Display order. We show whatever exists, in this order.
 DISPLAY_ORDER = [
-    "knee_valgus_left", "knee_valgus_right", "valgus_asymmetry", "trunk_lean_lateral",
+    "knee_valgus_left", "knee_valgus_right", "valgus_asymmetry", "kasr", "trunk_lean_lateral",
     "knee_flexion_left", "knee_flexion_right", "flexion_asymmetry",
     "hip_flexion_left", "hip_flexion_right", "trunk_lean_forward",
     "knee_flexion", "knee_valgus", "trunk_lean", "asymmetry", "hip_flexion",
@@ -51,8 +52,8 @@ DISPLAY_ORDER = [
 # ABSOLUTE value. PLACEHOLDERS — Part 5 replaces these with values cited
 # from ACL injury-prevention literature.
 THRESHOLDS = {
-    "knee_valgus_left": (10, 15),
-    "knee_valgus_right": (10, 15),
+    "knee_valgus_left": (0.15, 0.25),
+    "knee_valgus_right": (0.15, 0.25),
     "knee_valgus": (10, 15),
     "trunk_lean_lateral": (10, 15),
     "trunk_lean_forward": (30, 45),

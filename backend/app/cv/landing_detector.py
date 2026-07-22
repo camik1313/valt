@@ -202,3 +202,63 @@ def detect_landing(per_frame: list[Landmarks], smooth_window: int = 5) -> Landin
         confident=confident,
         note=note,
     )
+
+
+def find_standing_window(
+    per_frame: list[Landmarks],
+    airborne_peak_frame: int,
+    min_len: int = 8,
+) -> tuple[int, int] | None:
+    """
+    Find a STANDING window: a run of frames BEFORE the jump where the hips
+    barely move vertically. That window is the athlete's own baseline —
+    same body, stance, and camera setup as the landing, which is exactly
+    what we need to cancel perspective and anatomy from the valgus index.
+
+    Returns (start_frame, end_frame) inclusive, or None if no stable
+    standing period exists (e.g. a jump-only clip with no lead-in).
+
+    METHOD: look only at frames before the jump peak. Compute frame-to-frame
+    vertical speed of the hips. A "standing" stretch is a maximal run of
+    consecutive frames whose speed stays below a small threshold. We take
+    the longest such run if it is at least `min_len` frames.
+    """
+    if airborne_peak_frame < min_len:
+        return None  # not enough lead-in before the jump
+
+    raw = hip_trajectory(per_frame)
+    filled = _fill_gaps(raw)
+    traj = smooth(filled, window=5)
+
+    # Only consider the pre-jump portion.
+    region = traj[:airborne_peak_frame]
+    if len(region) < min_len:
+        return None
+
+    # Frame-to-frame vertical speed.
+    speeds = [abs(region[i + 1] - region[i]) for i in range(len(region) - 1)]
+    if not speeds:
+        return None
+
+    # "Barely moving" = speed below a small fraction of the total jump travel,
+    # so the threshold scales with the clip rather than being a magic number.
+    jump_travel = max(traj) - min(traj)
+    threshold = max(0.002, jump_travel * 0.05)
+
+    # Find the longest run of consecutive low-speed frames.
+    best_start = best_end = None
+    best_len = 0
+    run_start = 0
+    for i in range(len(speeds) + 1):
+        moving = i == len(speeds) or speeds[i] > threshold
+        if moving:
+            run_len = i - run_start
+            if run_len > best_len:
+                best_len = run_len
+                best_start, best_end = run_start, i  # frames [run_start, i]
+            run_start = i + 1
+
+    if best_len >= min_len and best_start is not None:
+        # end index in speeds maps to frame best_end (inclusive of that frame).
+        return (best_start, min(best_end, airborne_peak_frame - 1))
+    return None

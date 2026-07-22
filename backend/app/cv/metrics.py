@@ -118,33 +118,12 @@ def trunk_lean(shoulder_mid: Point, hip_mid: Point) -> float:
     return angle_between(trunk, vertical_up)
 
 
-def knee_valgus(hip: Point, knee: Point, ankle: Point) -> float:
-    """
-    Dynamic knee valgus, approximated by the Frontal Plane Projection
-    Angle (FPPA): how far the knee deviates from the straight line
-    between hip and ankle, viewed head-on.
-
-    We reuse the interior hip-knee-ankle angle. Perfect vertical
-    alignment gives ~180 deg; any inward (or outward) knee deviation
-    reduces it. We report the DEVIATION from straight:
-        0 deg  = knee tracks straight over the ankle
-        larger = more collapse (valgus if inward)
-
-    LIMITATION: from a single 2D view this magnitude doesn't tell
-    valgus (inward) from varus (outward) on its own, and it depends
-    on the camera being roughly front-on. We document this in Part 5.
-    """
-    interior = angle_at_joint(hip, knee, ankle)
-    return 180.0 - interior
-
-
 def asymmetry_percent(left_value: float, right_value: float) -> float:
     """
     Left/right asymmetry as a percentage difference.
 
-    Formula: |L - R| / mean(L, R) * 100.
-    Using the mean as the denominator makes it symmetric (swapping
-    L and R gives the same answer). Returns 0 if both are 0.
+    Formula: |L - R| / mean(|L|, |R|) * 100.
+    Symmetric (swapping L and R gives the same answer). Returns 0 if both 0.
     """
     mean = (abs(left_value) + abs(right_value)) / 2.0
     if mean == 0:
@@ -152,68 +131,102 @@ def asymmetry_percent(left_value: float, right_value: float) -> float:
     return abs(left_value - right_value) / mean * 100.0
 
 
-# ---- Signed valgus (frontal plane) ---------------------------
+# ============================================================
+# FRONTAL-PLANE VALGUS (horizontal, foreshortening-proof)
+#
+# WHY NO ANGLE FUNCTION:
+# The hip-knee-ankle angle from the front (the "Frontal Plane Projection
+# Angle") is NOT reliable from a single 2D camera. During a landing the
+# shin tilts toward the camera and FORESHORTENS (~35% shorter in test
+# footage). A foreshortened shin makes a tiny sideways knee offset read as
+# a huge angle: in real data an ~8 cm offset reported as 56 deg.
+#
+# THE FIX: foreshortening compresses depth (lengths, angles) but does NOT
+# move x-coordinates sideways. So horizontal data is trustworthy — and
+# sideways knee motion IS what valgus physically is. We measure horizontal
+# knee displacement, normalized by hip width. The pipeline additionally
+# compares this against the athlete's own standing baseline (captured in
+# the same clip) to cancel body proportions, stance, and camera perspective.
+# ============================================================
 
-def knee_valgus_signed(hip: Point, knee: Point, ankle: Point, side: str) -> float:
+def hip_width(left_hip: Point, right_hip: Point) -> float:
+    """Horizontal distance between the hips — the scale reference."""
+    return abs(left_hip[0] - right_hip[0])
+
+
+def knee_valgus_index(
+    hip: Point, knee: Point, ankle: Point, hip_width_value: float, side: str
+) -> float:
     """
-    Dynamic knee valgus in degrees, WITH DIRECTION.
+    Frontal-plane knee deviation as a fraction of hip width.
 
-        positive = VALGUS  (knee caves toward the body's midline — "knock-kneed")
-        negative = VARUS   (knee bows away from the midline — "bow-legged")
-        ~0       = knee tracks straight over the ankle
+        positive = MEDIAL  (knee toward midline -> valgus / knock-kneed)
+        negative = LATERAL (knee away from midline -> varus / bow-legged)
+        ~0       = knee tracks over the hip-ankle line
 
-    ONLY MEANINGFUL FROM A FRONT-ON VIEW. Valgus is a frontal-plane motion;
-    from a side view this number is measuring knee flexion instead and is
-    scientifically meaningless. The caller must know its camera view.
+    e.g. 0.25 means the knee sits a quarter of a hip-width inside the
+    straight line from hip to ankle.
 
-    HOW IT WORKS:
-      1. The MAGNITUDE is the 2D deviation of the hip-knee-ankle angle from
-         straight (180 deg) — the standard Frontal Plane Projection Angle idea.
-      2. The DIRECTION comes from comparing the knee's x-position against the
-         straight line from hip to ankle. If the knee sits toward the midline,
-         that's valgus; away from it, varus. The plain angle cannot tell these
-         apart, which is why we compute the sign separately.
+    ONLY MEANINGFUL FROM A FRONT VIEW. Uses horizontal positions only, so
+    it is immune to the shin foreshortening that corrupts angle methods.
 
     Args:
-        side: "left" or "right" — the SUBJECT'S anatomical side. Needed because
-            in a front-on view the subject's LEFT appears on the image's RIGHT,
-            so "toward the midline" is a different x-direction for each leg.
+        hip_width_value: horizontal hip-to-hip distance (scale). Must be > 0.
+        side: "left" or "right" (SUBJECT's anatomical side). In a front view
+            the subject's LEFT appears on the image RIGHT, so "toward midline"
+            is a different image-direction per leg.
 
-    NOTE: assumes an un-mirrored front view. Phone selfie cameras mirror the
-    image, which would swap left and right.
+    NOTE: assumes an un-mirrored front view (selfie cameras mirror the image).
     """
-    magnitude = 180.0 - angle_at_joint(hip, knee, ankle)
+    if hip_width_value <= 1e-9:
+        return 0.0
 
     hip_x, hip_y = hip
     knee_x, knee_y = knee
     ankle_x, ankle_y = ankle
 
-    # Where would the knee be if the leg were perfectly straight? Find the
-    # point on the hip->ankle line at the knee's height.
+    # Where the knee WOULD sit if the leg were straight: the point on the
+    # hip->ankle line at the knee's height.
     if abs(ankle_y - hip_y) < 1e-9:
-        return 0.0  # degenerate: hip and ankle at the same height
+        return 0.0
     t = (knee_y - hip_y) / (ankle_y - hip_y)
     line_x = hip_x + t * (ankle_x - hip_x)
 
-    # How far, horizontally, is the real knee from that straight-leg line?
-    # Positive means the knee sits to the RIGHT of the line in the image.
-    horizontal_deviation = knee_x - line_x
+    # Pure horizontal offset (positive = knee right of the line in the image).
+    deviation = knee_x - line_x
 
-    # Convert "image right/left" into "medial/lateral" for this leg.
-    # Front-on: subject's LEFT leg appears on the image RIGHT, so medial
-    # (toward midline) means moving LEFT in the image = negative deviation.
-    if side.lower() == "left":
-        medial = -horizontal_deviation
-    else:
-        medial = horizontal_deviation
+    # Convert image left/right into medial/lateral for this leg.
+    medial = -deviation if side.lower() == "left" else deviation
 
-    return magnitude if medial >= 0 else -magnitude
+    return medial / hip_width_value
+
+
+def knee_ankle_separation_ratio(
+    left_knee: Point, right_knee: Point, left_ankle: Point, right_ankle: Point
+) -> float:
+    """
+    Knee-to-Ankle Separation Ratio (KASR): knee spacing / ankle spacing,
+    horizontally.
+
+        < 1 = knees closer than ankles -> VALGUS
+        ~ 1 = knees over ankles
+        > 1 = knees wider than ankles -> varus
+
+    A ratio, so body size cancels. Immune to squat depth (unlike an angle).
+    Still perspective-sensitive; compare to the standing baseline to correct.
+    """
+    knee_sep = abs(left_knee[0] - right_knee[0])
+    ankle_sep = abs(left_ankle[0] - right_ankle[0])
+    if ankle_sep <= 1e-9:
+        return 1.0
+    return knee_sep / ankle_sep
 
 
 def lateral_trunk_lean(shoulder_mid: Point, hip_mid: Point) -> float:
     """
     Sideways trunk lean, from a FRONT view. Same geometry as trunk_lean();
-    named separately so the calling code is explicit about which plane it
-    is measuring. From a front camera, trunk_lean() captures LATERAL tilt.
+    named separately so calling code is explicit about the plane. The trunk
+    is a long near-vertical segment, so foreshortening barely affects it —
+    unlike the leg angles, this one survives a front view.
     """
     return trunk_lean(shoulder_mid, hip_mid)

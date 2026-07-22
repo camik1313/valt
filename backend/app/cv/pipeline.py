@@ -27,7 +27,7 @@
 from dataclasses import dataclass, field
 
 from app.cv import metrics, pose_estimator
-from app.cv.landing_detector import detect_landing
+from app.cv.landing_detector import detect_landing, find_standing_window
 
 L_SHOULDER, R_SHOULDER = 11, 12
 L_HIP, R_HIP = 23, 24
@@ -46,9 +46,10 @@ VIEW_SIDE = "side"
 # scientific contract of the whole file.
 VALID_MEASUREMENTS = {
     VIEW_FRONT: [
-        "knee_valgus_left",
+        "knee_valgus_left",     # horizontal index, hip-widths (+ = medial/valgus)
         "knee_valgus_right",
-        "valgus_asymmetry",
+        "valgus_asymmetry",     # difference between legs (perspective-robust)
+        "kasr",                 # knee/ankle separation ratio
         "trunk_lean_lateral",
     ],
     VIEW_SIDE: [
@@ -163,31 +164,99 @@ def run_pipeline(seed: str, video_path: str, view: str = VIEW_FRONT) -> Pipeline
     hip_mid = _midpoint(_point(landmarks, L_HIP), _point(landmarks, R_HIP))
 
     if view == VIEW_FRONT:
-        # --- FRONTAL PLANE: valgus and lateral lean ---
-        if left_leg_ok:
-            measurements["knee_valgus_left"] = round(
-                metrics.knee_valgus_signed(
-                    _point(landmarks, L_HIP), _point(landmarks, L_KNEE),
-                    _point(landmarks, L_ANKLE), side="left",
-                ), 1,
-            )
-        if right_leg_ok:
-            measurements["knee_valgus_right"] = round(
-                metrics.knee_valgus_signed(
-                    _point(landmarks, R_HIP), _point(landmarks, R_KNEE),
-                    _point(landmarks, R_ANKLE), side="right",
-                ), 1,
+        # --- FRONTAL PLANE: valgus (horizontal index) + lateral lean ---
+        # Helper: compute per-leg valgus index at a given frame's landmarks.
+        def valgus_at(fr_landmarks):
+            lh, rh = _point(fr_landmarks, L_HIP), _point(fr_landmarks, R_HIP)
+            hw = metrics.hip_width(lh, rh)
+            out = {}
+            if _visible(fr_landmarks, L_HIP, L_KNEE, L_ANKLE):
+                out["left"] = metrics.knee_valgus_index(
+                    lh, _point(fr_landmarks, L_KNEE), _point(fr_landmarks, L_ANKLE), hw, "left"
+                )
+            if _visible(fr_landmarks, R_HIP, R_KNEE, R_ANKLE):
+                out["right"] = metrics.knee_valgus_index(
+                    rh, _point(fr_landmarks, R_KNEE), _point(fr_landmarks, R_ANKLE), hw, "right"
+                )
+            return out
+
+        def kasr_at(fr_landmarks):
+            if not _visible(fr_landmarks, L_KNEE, R_KNEE, L_ANKLE, R_ANKLE):
+                return None
+            return metrics.knee_ankle_separation_ratio(
+                _point(fr_landmarks, L_KNEE), _point(fr_landmarks, R_KNEE),
+                _point(fr_landmarks, L_ANKLE), _point(fr_landmarks, R_ANKLE),
             )
 
-        # Asymmetry between the two legs' valgus.
+        landing_valgus = valgus_at(landmarks)
+        landing_kasr = kasr_at(landmarks)
+
+        # --- Try to find a standing baseline in the same clip ---
+        window = find_standing_window(extraction.per_frame, landing.airborne_peak_frame)
+        baseline_applied = False
+        base_valgus = {"left": 0.0, "right": 0.0}
+        base_kasr = None
+
+        if window is not None:
+            start, end = window
+            # Average the index across the standing frames (kills jitter).
+            l_vals, r_vals, kasr_vals = [], [], []
+            for i in range(start, end + 1):
+                fr = extraction.per_frame[i]
+                if fr is None:
+                    continue
+                v = valgus_at(fr)
+                if "left" in v:
+                    l_vals.append(v["left"])
+                if "right" in v:
+                    r_vals.append(v["right"])
+                k = kasr_at(fr)
+                if k is not None:
+                    kasr_vals.append(k)
+            if l_vals:
+                base_valgus["left"] = sum(l_vals) / len(l_vals)
+            if r_vals:
+                base_valgus["right"] = sum(r_vals) / len(r_vals)
+            if kasr_vals:
+                base_kasr = sum(kasr_vals) / len(kasr_vals)
+            baseline_applied = True
+            notes.append(
+                f"Standing baseline found (frames {start}-{end}); valgus reported "
+                f"as CHANGE from standing to landing (cancels stance and camera "
+                f"perspective)."
+            )
+        else:
+            notes.append(
+                "No standing baseline in this clip, so valgus is UNCORRECTED — "
+                "camera perspective may inflate it. Film a few seconds of standing "
+                "before the jump (the guided capture does this automatically). "
+                "Left/right asymmetry is still reliable without a baseline."
+            )
+
+        # Report the baseline-corrected value where possible.
+        if "left" in landing_valgus:
+            measurements["knee_valgus_left"] = round(
+                landing_valgus["left"] - base_valgus["left"], 3
+            )
+        if "right" in landing_valgus:
+            measurements["knee_valgus_right"] = round(
+                landing_valgus["right"] - base_valgus["right"], 3
+            )
         if "knee_valgus_left" in measurements and "knee_valgus_right" in measurements:
             measurements["valgus_asymmetry"] = round(
                 metrics.asymmetry_percent(
-                    measurements["knee_valgus_left"], measurements["knee_valgus_right"]
+                    landing_valgus["left"], landing_valgus["right"]
                 ), 1,
             )
         else:
             notes.append("Only one leg was visible; asymmetry could not be measured.")
+
+        if landing_kasr is not None:
+            kasr_value = landing_kasr - (base_kasr if base_kasr is not None else 0.0) + (
+                1.0 if base_kasr is not None else 0.0
+            )
+            # If baseline exists, express KASR relative to standing (standing = 1.0).
+            measurements["kasr"] = round(kasr_value, 3)
 
         if shoulders_ok:
             measurements["trunk_lean_lateral"] = round(
@@ -196,7 +265,7 @@ def run_pipeline(seed: str, video_path: str, view: str = VIEW_FRONT) -> Pipeline
 
         notes.append(
             "Front view: measuring the FRONTAL plane (knee valgus, lateral lean). "
-            "Knee and hip flexion are sagittal-plane motions and cannot be measured "
+            "Knee/hip flexion are sagittal-plane motions and cannot be measured "
             "from this angle — film from the side for those."
         )
 
