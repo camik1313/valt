@@ -114,6 +114,12 @@ export default function AnalyzePage() {
         <p className="mt-3 text-muted">
           Front-facing clip, athlete landing in frame. We&apos;ll measure the mechanics.
         </p>
+        <p className="mt-2 text-sm text-muted">
+          No clip yet?{" "}
+          <Link href="/capture" className="text-track hover:underline">
+            Record one now with guided capture →
+          </Link>
+        </p>
       </div>
 
       {/* ---- IDLE: pick a file, name the athlete, start ---- */}

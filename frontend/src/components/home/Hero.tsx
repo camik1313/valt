@@ -47,6 +47,9 @@ export default function Hero() {
             <Button href="/analyze" variant="primary">
               Analyze a video →
             </Button>
+            <Button href="/capture" variant="outline">
+              Record with guided capture
+            </Button>
             <Button href="/#how" variant="outline">
               See how it works
             </Button>
