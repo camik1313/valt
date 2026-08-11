@@ -99,14 +99,33 @@ def test_trunk_lean_45_degrees():
     assert metrics.trunk_lean(shoulder_mid, hip_mid) == pytest.approx(45.0)
 
 
-# ---- knee_valgus (0 = aligned) ----
+# ---- knee_valgus_index (0 = aligned; + = medial/valgus, - = lateral/varus) ----
 
-def test_knee_valgus_aligned():
-    # hip, knee, ankle vertically aligned -> no valgus deviation.
+def test_knee_valgus_index_aligned():
+    # hip, knee, ankle vertically aligned -> knee sits exactly on the
+    # hip-ankle line -> no deviation regardless of side.
     hip = (0, 0)
     knee = (0, 1)
     ankle = (0, 2)
-    assert metrics.knee_valgus(hip, knee, ankle) == pytest.approx(0.0)
+    assert metrics.knee_valgus_index(hip, knee, ankle, hip_width_value=0.2, side="left") == pytest.approx(0.0)
+    assert metrics.knee_valgus_index(hip, knee, ankle, hip_width_value=0.2, side="right") == pytest.approx(0.0)
+
+
+def test_knee_valgus_index_medial_deviation():
+    # Left leg: knee sits toward the image's right of the hip-ankle line.
+    # For the LEFT leg, "toward midline" (valgus) is a positive image-x
+    # deviation (see the medial/lateral sign-flip in knee_valgus_index).
+    hip = (0, 0)
+    knee = (0.05, 1)   # knee offset 0.05 to the right of the hip-ankle line
+    ankle = (0, 2)
+    hip_width_value = 0.2
+    # deviation = 0.05, medial = -deviation for "left" = -0.05 (lateral)... so
+    # flip the offset direction to get a positive (medial/valgus) reading.
+    left_result = metrics.knee_valgus_index(hip, (-0.05, 1), ankle, hip_width_value, "left")
+    assert left_result == pytest.approx(0.05 / 0.2)
+
+    right_result = metrics.knee_valgus_index(hip, knee, ankle, hip_width_value, "right")
+    assert right_result == pytest.approx(0.05 / 0.2)
 
 
 # ---- asymmetry_percent ----

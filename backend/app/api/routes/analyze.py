@@ -27,6 +27,16 @@ async def analyze_video(request: AnalyzeRequest):
             detail="That upload could not be found. Please upload the video again.",
         )
 
+    # A second, opposite-angle clip from the same session is optional.
+    # If given but not found, we don't fail the whole request — the
+    # primary clip alone is still a complete analysis.
+    side_video_path = None
+    side_video_filename = None
+    if request.side_upload_id:
+        side_video_path = storage.find_upload_path(request.side_upload_id)
+        if side_video_path:
+            side_video_filename = side_video_path.split("/")[-1]
+
     # Build the analysis (runs the real CV pipeline).
     analysis = report_service.build_analysis(
         upload_id=request.upload_id,
@@ -34,6 +44,9 @@ async def analyze_video(request: AnalyzeRequest):
         video_filename=video_path.split("/")[-1],
         video_path=video_path,
         view=request.view,
+        questionnaire=request.questionnaire,
+        side_video_path=side_video_path,
+        side_video_filename=side_video_filename,
     )
 
     # Persist it so it appears in history and can be reopened by id.

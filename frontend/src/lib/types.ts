@@ -21,15 +21,81 @@ export type Metric = {
 //   side  -> sagittal plane -> knee/hip flexion, forward trunk lean
 export type CameraView = "front" | "side";
 
+// ============================================================
+// SCREENING RISK SCORE — mirrors backend/app/risk/scoring.py and
+// backend/app/models/schemas.py. See scoring.py for the full "what this
+// is and isn't" explanation: NOT a diagnosis, NOT a trained model, NEVER
+// an injury probability — just a transparent points-based checklist over
+// (a) the biomechanical error criteria this app's 2D pipeline can measure
+// (a LESS-inspired SUBSET, not the full 17-item LESS) and (b) an optional
+// self-report questionnaire.
+// ============================================================
+
+// The optional self-report questionnaire. Every field is optional —
+// leave the whole object out to skip it entirely.
+export type QuestionnaireAnswers = {
+  previousAclInjury?: boolean | null;
+  sex?: "female" | "male" | "other" | "prefer_not_to_say" | null;
+  sportType?:
+    | "pivoting_cutting"
+    | "field_court_other"
+    | "endurance_noncontact"
+    | "other"
+    | null;
+  age?: number | null;
+  activityLevel?:
+    | "sedentary"
+    | "recreational"
+    | "competitive_high_school"
+    | "competitive_college_or_pro"
+    | null;
+  fatigueReported?: boolean | null;
+  previousLowerLimbInjury?: boolean | null;
+};
+
+// One factor that moved the screening score, in plain language.
+export type ContributingFactor = {
+  key: string;
+  label: string;
+  points: number;
+  detail: string;
+};
+
+// Subtotal for one half of the score (biomechanical or questionnaire).
+export type PartialScore = {
+  points: number;
+  maxPoints: number;
+  factors: ContributingFactor[];
+};
+
+// The full screening result attached to an Analysis.
+export type RiskScore = {
+  band: "low" | "moderate" | "elevated";
+  percentOfMax: number;      // 0..100, percent of ACHIEVABLE points — not a probability
+  totalPoints: number;
+  totalMaxPoints: number;
+  biomechanical: PartialScore;
+  // null when no questionnaire was submitted — show the biomechanical
+  // portion only in that case.
+  questionnaire: PartialScore | null;
+  factors: ContributingFactor[];   // biomechanical + questionnaire, combined
+  disclaimer: string;
+};
+
 // A single completed analysis of one video.
 export type Analysis = {
   id: string;
   athleteName: string;
   createdAt: string;      // ISO date string
   videoFilename: string;
-  view: CameraView;       // which plane was measured
+  // "front", "side", or "front+side" / "side+front" when a same-session
+  // second clip from the opposite angle was combined into this analysis.
+  view: string;
   metrics: Metric[];
   summary: string;        // plain-language overview
+  // null when the real pipeline didn't run (e.g. mock fallback) — there
+  // are no real measurements to screen in that case.
+  riskScore: RiskScore | null;
 };
 
 // The status the upload screen moves through.

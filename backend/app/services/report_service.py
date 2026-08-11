@@ -10,9 +10,17 @@
 # averaging across legs — asymmetry is the point, and averaging hides it.
 # ============================================================
 
-from app.models.schemas import Analysis, Metric
+from app.models.schemas import (
+    Analysis,
+    ContributingFactor,
+    Metric,
+    PartialScore,
+    QuestionnaireAnswers,
+    RiskScore,
+)
 from app.services import storage
 from app.cv import pipeline, mock_pipeline
+from app.risk import scoring as risk_scoring
 
 # Set False to force the mock pipeline (instant, fake numbers).
 USE_REAL_PIPELINE = True
@@ -64,6 +72,58 @@ THRESHOLDS = {
 }
 
 
+def _to_scoring_answers(
+    questionnaire: QuestionnaireAnswers | None,
+) -> risk_scoring.QuestionnaireAnswers | None:
+    """Convert the wire-facing (Pydantic) questionnaire into the plain
+    dataclass risk/scoring.py works with, so scoring stays framework-free."""
+    if questionnaire is None:
+        return None
+    return risk_scoring.QuestionnaireAnswers(
+        previous_acl_injury=questionnaire.previous_acl_injury,
+        sex=questionnaire.sex,
+        sport_type=questionnaire.sport_type,
+        age=questionnaire.age,
+        activity_level=questionnaire.activity_level,
+        fatigue_reported=questionnaire.fatigue_reported,
+        previous_lower_limb_injury=questionnaire.previous_lower_limb_injury,
+    )
+
+
+def _to_risk_score_schema(result: risk_scoring.ScreeningResult) -> RiskScore:
+    """Convert risk/scoring.py's plain-dataclass result into the Pydantic
+    schema that goes out over the wire (camelCase, via CamelModel)."""
+
+    def factors(fs: list[risk_scoring.ContributingFactor]) -> list[ContributingFactor]:
+        return [
+            ContributingFactor(key=f.key, label=f.label, points=f.points, detail=f.detail)
+            for f in fs
+        ]
+
+    questionnaire_score = None
+    if result.questionnaire is not None:
+        questionnaire_score = PartialScore(
+            points=result.questionnaire.points,
+            max_points=result.questionnaire.max_points,
+            factors=factors(result.questionnaire.factors),
+        )
+
+    return RiskScore(
+        band=result.band,
+        percent_of_max=result.percent_of_max,
+        total_points=result.total_points,
+        total_max_points=result.total_max_points,
+        biomechanical=PartialScore(
+            points=result.biomechanical.points,
+            max_points=result.biomechanical.max_points,
+            factors=factors(result.biomechanical.factors),
+        ),
+        questionnaire=questionnaire_score,
+        factors=factors(result.factors),
+        disclaimer=result.disclaimer,
+    )
+
+
 def _band(key: str, value: float) -> str:
     """Convert a raw measurement into ok / watch / flag."""
     # Flexion is inverted: LOW flexion (a stiff landing) is the concern.
@@ -95,17 +155,30 @@ def build_analysis(
     video_filename: str,
     video_path: str | None = None,
     view: str = "front",
+    questionnaire: QuestionnaireAnswers | None = None,
+    side_video_path: str | None = None,
+    side_video_filename: str | None = None,
 ) -> Analysis:
     """
     Run the pipeline on a video and assemble a full Analysis.
 
-    Falls back to the mock if the real pipeline fails, clearly labeled so
-    simulated numbers can never be mistaken for measurements.
+    Falls back to the mock if the PRIMARY clip's real pipeline fails,
+    clearly labeled so simulated numbers can never be mistaken for
+    measurements.
+
+    Optionally accepts a SECOND clip from the same session, filmed from the
+    opposite camera angle (see AnalyzeRequest.side_upload_id). When given
+    and the primary clip was real, its measurements are merged in — this is
+    what lets the screening score see both frontal- and sagittal-plane
+    criteria instead of just one. The second clip is a bonus, not a
+    requirement: if it fails to analyze, we keep the primary clip's real
+    measurements and just note that the second angle is missing, rather
+    than discarding a real result.
     """
     used_mock = False
     fallback_reason = ""
 
-    # ---- 1) Raw measurements ----
+    # ---- 1) Primary clip ----
     if USE_REAL_PIPELINE and video_path:
         try:
             result = pipeline.run_pipeline(seed=upload_id, video_path=video_path, view=view)
@@ -118,21 +191,45 @@ def build_analysis(
         used_mock = True
         fallback_reason = "Real pipeline disabled."
 
-    # ---- 2) Label and band ----
+    measurements: dict[str, float] = dict(result.measurements)
+    notes: list[str] = list(result.notes)
+    views_used = [view]
+
+    # ---- 2) Optional second clip, opposite angle, same session ----
+    if not used_mock and side_video_path:
+        side_view = "side" if view == "front" else "front"
+        try:
+            side_result = pipeline.run_pipeline(
+                seed=f"{upload_id}-side", video_path=side_video_path, view=side_view
+            )
+            measurements.update(side_result.measurements)
+            notes.extend(side_result.notes)
+            views_used.append(side_view)
+        except Exception as exc:
+            notes.append(
+                f"The {side_view}-view clip from this session couldn't be analyzed "
+                f"({exc}), so only {view}-view measurements are included below."
+            )
+
+    # ---- 3) Label and band ----
     metrics_list: list[Metric] = []
     for key in DISPLAY_ORDER:
-        if key not in result.measurements:
+        if key not in measurements:
             continue
-        value = result.measurements[key]
+        value = measurements[key]
         label, unit = LABELS.get(key, (key, ""))
         metrics_list.append(
             Metric(key=key, label=label, value=value, unit=unit, status=_band(key, value))
         )
 
-    # ---- 3) Summary ----
+    # ---- 4) Summary ----
     flags = [m.label for m in metrics_list if m.status == "flag"]
     watches = [m.label for m in metrics_list if m.status == "watch"]
-    plane = "frontal plane" if view == "front" else "sagittal plane"
+    view_label = "+".join(views_used)
+    plane = (
+        "frontal + sagittal planes" if len(views_used) > 1
+        else ("frontal plane" if view == "front" else "sagittal plane")
+    )
 
     if used_mock:
         summary = (
@@ -142,34 +239,52 @@ def build_analysis(
         )
     elif flags:
         summary = (
-            f"Analysis complete for {athlete_name} ({view} view, {plane}). "
+            f"Analysis complete for {athlete_name} ({view_label} view, {plane}). "
             f"Measured at the landing frame. The following stood out and may be "
             f"worth a closer look: {', '.join(flags)}. These are movement "
             f"observations from an automated tool, not a diagnosis."
         )
     elif watches:
         summary = (
-            f"Analysis complete for {athlete_name} ({view} view, {plane}). "
+            f"Analysis complete for {athlete_name} ({view_label} view, {plane}). "
             f"Most patterns look typical; {', '.join(watches)} sat near the "
             f"borderline. These are movement observations, not a diagnosis."
         )
     else:
         summary = (
-            f"Analysis complete for {athlete_name} ({view} view, {plane}). "
+            f"Analysis complete for {athlete_name} ({view_label} view, {plane}). "
             f"All measured patterns fell within typical ranges for this landing. "
             f"These are movement observations, not a diagnosis."
         )
 
-    if not used_mock and result.notes:
-        summary += " " + " ".join(result.notes)
+    if not used_mock and notes:
+        summary += " " + " ".join(notes)
 
-    # ---- 4) Assemble ----
+    # ---- 5) Screening risk score ----
+    # Only computed when the real pipeline actually produced measurements.
+    # A mock fallback has no real biomechanics to screen, so we don't
+    # fabricate a score off placeholder numbers — see risk/scoring.py.
+    # Because `measurements` may now include both frontal- and sagittal-
+    # plane keys, the score's achievable max grows to match.
+    risk_score = None
+    if not used_mock:
+        screening = risk_scoring.compute_screening_score(
+            measurements, _to_scoring_answers(questionnaire)
+        )
+        risk_score = _to_risk_score_schema(screening)
+
+    # ---- 6) Assemble ----
+    combined_filename = video_filename
+    if side_video_filename:
+        combined_filename = f"{video_filename} + {side_video_filename}"
+
     return Analysis(
         id=storage.new_analysis_id(),
         athlete_name=athlete_name,
         created_at=storage.now_iso(),
-        video_filename=video_filename,
-        view=view,
+        video_filename=combined_filename,
+        view=view_label,
         metrics=metrics_list,
         summary=summary,
+        risk_score=risk_score,
     )

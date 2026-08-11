@@ -10,7 +10,7 @@
 // without changing code.
 // ============================================================
 
-import { Analysis, CameraView } from "./types";
+import { Analysis, CameraView, QuestionnaireAnswers } from "./types";
 
 // Read the backend URL from the environment, with a sensible fallback.
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -60,15 +60,29 @@ export async function uploadVideo(file: File): Promise<UploadResult> {
 }
 
 // ---- POST /analyze : run analysis on an uploaded video ----
+// `questionnaire` is optional — omit it to get a risk score covering the
+// biomechanical portion only (see RiskScore in types.ts).
+// `sideUploadId` is an optional SECOND clip from the same session, filmed
+// from the opposite angle (front primary -> side second, or vice versa).
+// When given, its measurements are merged with the primary clip's, so the
+// screening score can see both frontal- and sagittal-plane criteria.
 export async function analyzeVideo(
   uploadId: string,
   athleteName: string,
-  view: CameraView
+  view: CameraView,
+  questionnaire?: QuestionnaireAnswers,
+  sideUploadId?: string
 ): Promise<Analysis> {
   const res = await fetch(`${API_URL}/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ uploadId, athleteName, view }),
+    body: JSON.stringify({
+      uploadId,
+      athleteName,
+      view,
+      questionnaire,
+      sideUploadId,
+    }),
   });
   return handle<Analysis>(res);
 }

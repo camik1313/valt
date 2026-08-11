@@ -17,7 +17,8 @@ import Link from "next/link";
 import VideoUploader from "@/components/upload/VideoUploader";
 import ProcessingStatus from "@/components/upload/ProcessingStatus";
 import Button from "@/components/ui/Button";
-import { ProcessingStage, CameraView } from "@/lib/types";
+import QuestionnaireForm, { hasAnyAnswer } from "@/components/questionnaire/QuestionnaireForm";
+import { ProcessingStage, CameraView, QuestionnaireAnswers } from "@/lib/types";
 import { uploadVideo, analyzeVideo } from "@/lib/api";
 
 export default function AnalyzePage() {
@@ -28,6 +29,8 @@ export default function AnalyzePage() {
   // Which camera angle this clip was filmed from. This decides which
   // measurements are scientifically valid (frontal vs sagittal plane).
   const [view, setView] = useState<CameraView>("front");
+  const [showQuestionnaire, setShowQuestionnaire] = useState(false);
+  const [questionnaire, setQuestionnaire] = useState<QuestionnaireAnswers>({});
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -68,7 +71,12 @@ export default function AnalyzePage() {
 
       // 2) PROCESSING. Ask the backend to analyze the uploaded video.
       setStage("processing");
-      const analysis = await analyzeVideo(upload.uploadId, athleteName, view); // POST /analyze
+      const analysis = await analyzeVideo(
+        upload.uploadId,
+        athleteName,
+        view,
+        hasAnyAnswer(questionnaire) ? questionnaire : undefined
+      ); // POST /analyze
 
       // 3) COMPLETE. Remember the id so we can link to the real report.
       setAnalysisId(analysis.id);
@@ -90,6 +98,8 @@ export default function AnalyzePage() {
     setProgress(0);
     setAnalysisId(null);
     setErrorMsg(null);
+    setShowQuestionnaire(false);
+    setQuestionnaire({});
   }
 
   return (
@@ -174,6 +184,29 @@ export default function AnalyzePage() {
                   ))}
                 </div>
               </fieldset>
+
+              {/* Optional screening questionnaire — adds self-reported risk
+                  factors to the biomechanical score. See RiskScoreCard on
+                  the report page for how this is used. */}
+              <div className="mt-5 border-t border-line pt-5">
+                <button
+                  type="button"
+                  onClick={() => setShowQuestionnaire((v) => !v)}
+                  className="flex w-full items-center justify-between text-left"
+                >
+                  <span className="text-sm font-medium text-ink">
+                    Screening questionnaire (optional)
+                  </span>
+                  <span className="text-xs text-track">
+                    {showQuestionnaire ? "Hide" : "Add"}
+                  </span>
+                </button>
+                {showQuestionnaire && (
+                  <div className="mt-4">
+                    <QuestionnaireForm value={questionnaire} onChange={setQuestionnaire} />
+                  </div>
+                )}
+              </div>
 
               <div className="mt-6 flex gap-3">
                 <Button onClick={startAnalysis} variant="primary" className="flex-1">

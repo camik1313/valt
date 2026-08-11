@@ -16,6 +16,7 @@ import { Analysis } from "@/lib/types";
 import { getReport } from "@/lib/api";
 import MetricCard from "@/components/report/MetricCard";
 import ReportChart from "@/components/report/ReportChart";
+import RiskScoreCard from "@/components/risk/RiskScoreCard";
 import Button from "@/components/ui/Button";
 
 export default function ReportPage({ params }: { params: { id: string } }) {
@@ -105,6 +106,11 @@ export default function ReportPage({ params }: { params: { id: string } }) {
         {analysis.metrics.map((m) => (
           <MetricCard key={m.key} metric={m} />
         ))}
+      </div>
+
+      {/* Screening risk score */}
+      <div className="mt-8">
+        <RiskScoreCard riskScore={analysis.riskScore} />
       </div>
 
       {/* Disclaimer + actions */}
