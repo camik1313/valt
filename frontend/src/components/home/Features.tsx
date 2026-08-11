@@ -6,28 +6,36 @@
 // ============================================================
 
 import Card from "@/components/ui/Card";
+import { BlobBadge } from "@/components/decor/Doodles";
 
-// The scientific measurements. Each maps to real literature.
+// The scientific measurements. Each maps to real literature. `hue` is
+// purely a categorical accent (which measurement is which at a glance) —
+// it never means "risk" the way the report page's ok/watch/flag colors do.
 const metrics = [
   {
     title: "Knee flexion",
     body: "Angle of the knee at landing. Stiff, low-flexion landings are associated with higher joint loading.",
+    hue: "bloom" as const,
   },
   {
     title: "Dynamic knee valgus",
     body: "Inward collapse of the knee relative to hip and ankle — one of the most-studied ACL-risk patterns.",
+    hue: "iris" as const,
   },
   {
     title: "Trunk lean",
     body: "Forward and lateral tilt of the torso, which shifts load and affects knee control on landing.",
+    hue: "sprout" as const,
   },
   {
     title: "Left / right asymmetry",
     body: "Differences between limbs. Large asymmetries can indicate compensation or reduced control on one side.",
+    hue: "track" as const,
   },
   {
     title: "Hip position",
     body: "Hip flexion and drop at landing, part of how force is absorbed up the kinetic chain.",
+    hue: "bloom" as const,
   },
 ];
 
@@ -37,6 +45,15 @@ const product = [
   { title: "Multiple athletes", body: "Organize analyses by athlete and revisit them over time." },
   { title: "Saved history", body: "Every analysis is stored so you can compare sessions and track change." },
 ];
+
+// Hex for the little crosshair icon inside each BlobBadge — kept in sync
+// with the badge's own hue.
+const ICON_HEX: Record<string, string> = {
+  bloom: "#EC5A94",
+  iris: "#8B6BF2",
+  sprout: "#2FBD7E",
+  track: "#0E7C86",
+};
 
 export default function Features() {
   return (
@@ -59,13 +76,13 @@ export default function Features() {
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {metrics.map((m) => (
             <Card key={m.title}>
-              <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-track-soft">
-                {/* small target/crosshair icon */}
+              <BlobBadge color={m.hue} className="mb-3 h-9 w-9">
+                {/* small target/crosshair icon, tinted to match the badge */}
                 <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                  <circle cx="9" cy="9" r="7" fill="none" stroke="#0E7C86" strokeWidth="1.5" />
-                  <circle cx="9" cy="9" r="2" fill="#0E7C86" />
+                  <circle cx="9" cy="9" r="7" fill="none" stroke={ICON_HEX[m.hue]} strokeWidth="1.5" />
+                  <circle cx="9" cy="9" r="2" fill={ICON_HEX[m.hue]} />
                 </svg>
-              </div>
+              </BlobBadge>
               <h3 className="font-display text-lg font-semibold text-ink">{m.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted">{m.body}</p>
             </Card>
@@ -75,9 +92,17 @@ export default function Features() {
         {/* The product feature strip */}
         <div className="mt-16 grid gap-5 md:grid-cols-3">
           {product.map((p) => (
-            <div key={p.title} className="rounded-xl bg-ink p-6 text-surface">
-              <h3 className="font-display text-lg font-semibold">{p.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-surface/70">{p.body}</p>
+            <div
+              key={p.title}
+              className="rounded-xl bg-gradient-to-br from-ink to-ink/80 p-6 text-surface relative overflow-hidden"
+            >
+              {/* a faint corner glow — subtle, doesn't fight the text */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-iris opacity-20 blur-2xl"
+              />
+              <h3 className="relative font-display text-lg font-semibold">{p.title}</h3>
+              <p className="relative mt-2 text-sm leading-relaxed text-surface/70">{p.body}</p>
             </div>
           ))}
         </div>

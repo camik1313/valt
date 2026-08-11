@@ -4,10 +4,21 @@
 // clear about scope and limitations is a strength, not a weakness.
 // ============================================================
 
+import { GradientBlob } from "@/components/decor/Doodles";
+
 export default function About() {
   return (
-    <section id="about" className="border-t border-line bg-white">
-      <div className="mx-auto max-w-6xl px-6 py-20">
+    <section id="about" className="relative overflow-hidden border-t border-line bg-white">
+      {/* A quiet color wash behind the mission column only — the honesty
+          panel to the right stays plain risk/track colors, untouched. */}
+      <GradientBlob
+        id="about-blob"
+        from="sprout"
+        to="track"
+        className="-left-20 top-1/2 h-72 w-72 -translate-y-1/2 opacity-25"
+      />
+
+      <div className="relative mx-auto max-w-6xl px-6 py-20">
         <div className="grid gap-12 md:grid-cols-2 md:items-start">
           {/* Mission */}
           <div>

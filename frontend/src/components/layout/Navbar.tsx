@@ -15,9 +15,9 @@ export default function Navbar() {
         <Link href="/" className="flex items-center gap-2">
           {/* Small SVG mark: two landmark dots joined by a line — the pose motif. */}
           <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
-            <line x1="7" y1="7" x2="19" y2="19" stroke="#0E7C86" strokeWidth="2" />
+            <line x1="7" y1="7" x2="19" y2="19" stroke="#8B6BF2" strokeWidth="2" />
             <circle cx="7" cy="7" r="4" fill="#132033" />
-            <circle cx="19" cy="19" r="4" fill="#0E7C86" />
+            <circle cx="19" cy="19" r="4" fill="#EC5A94" />
           </svg>
           <span className="font-display text-lg font-bold tracking-tight text-ink">
             VALT

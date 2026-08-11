@@ -8,6 +8,8 @@
 export default function Footer() {
   return (
     <footer className="border-t border-line bg-white">
+      {/* A thin gradient hairline — a small, quiet signature touch. */}
+      <div aria-hidden="true" className="h-[3px] w-full bg-gradient-to-r from-bloom via-iris to-sprout" />
       <div className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
           {/* Brand + one-line description */}

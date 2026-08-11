@@ -8,6 +8,7 @@
 // ============================================================
 
 import Button from "@/components/ui/Button";
+import { GradientBlob, Sparkle, DotCluster, Squiggle } from "@/components/decor/Doodles";
 
 export default function Hero() {
   return (
@@ -23,9 +24,31 @@ export default function Hero() {
         }}
       />
 
+      {/* Soft color-wash blobs, drifting slowly behind the content. */}
+      <GradientBlob
+        id="hero-blob-1"
+        from="bloom"
+        to="iris"
+        className="-left-24 -top-24 h-80 w-80 opacity-40 animate-drift"
+      />
+      <GradientBlob
+        id="hero-blob-2"
+        from="sprout"
+        to="track"
+        className="-right-16 top-10 h-72 w-72 opacity-30 animate-drift [animation-delay:-4s]"
+      />
+
       <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-6 py-20 md:grid-cols-2 md:py-28">
         {/* ---- Left: the message ---- */}
-        <div>
+        <div className="relative">
+          {/* Whimsical accents scattered near the headline. */}
+          <Sparkle className="absolute -left-6 top-2 h-4 w-4 animate-wiggle" color="bloom" />
+          <Sparkle
+            className="absolute left-40 -top-3 h-3 w-3 animate-wiggle [animation-delay:-2s]"
+            color="sprout"
+          />
+          <DotCluster className="absolute -right-2 top-16 hidden h-6 w-9 md:block" color="iris" />
+
           <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-track">
             <span className="h-1.5 w-1.5 rounded-full bg-track" />
             Biomechanics, from a smartphone video
@@ -34,7 +57,14 @@ export default function Hero() {
           <h1 className="mt-6 font-display text-4xl font-bold leading-[1.05] tracking-tight text-ink md:text-6xl">
             See the mechanics
             <br />
-            behind the landing.
+            behind the{" "}
+            <span className="relative inline-block">
+              landing.
+              <Squiggle
+                className="absolute -bottom-2 left-0 h-3 w-full"
+                color="bloom"
+              />
+            </span>
           </h1>
 
           <p className="mt-6 max-w-md text-lg leading-relaxed text-muted">
@@ -62,7 +92,18 @@ export default function Hero() {
 
         {/* ---- Right: the signature pose skeleton ---- */}
         <div className="relative">
-          <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
+          {/* A small glow tucked behind the card corner — the instrument
+              readout itself stays clean and precise, the whimsy lives
+              around it. */}
+          <GradientBlob
+            id="hero-card-glow"
+            from="iris"
+            to="bloom"
+            className="-right-8 -top-8 h-32 w-32 opacity-50"
+          />
+          <Sparkle className="absolute -right-2 -top-2 z-10 h-5 w-5 animate-wiggle" color="iris" />
+
+          <div className="relative rounded-2xl border border-line bg-white p-6 shadow-sm">
             {/* Little header row that mimics an analysis readout */}
             <div className="mb-4 flex items-center justify-between">
               <span className="font-mono text-xs text-muted">landing_frame.pose</span>

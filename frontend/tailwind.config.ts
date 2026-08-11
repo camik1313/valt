@@ -37,6 +37,24 @@ const config: Config = {
         },
         // Hairline borders / dividers.
         line: "#E2E8EF",
+        // ---- DECORATIVE PALETTE ----
+        // Pink / purple / green, used ONLY for illustration accents,
+        // doodles, and gradient washes (Doodles.tsx, hero/section
+        // backgrounds, category icon variety). NEVER for data or status
+        // meaning — status stays track (ok) / amber (watch) / risk (flag),
+        // always, so a measurement's color never gets ambiguous.
+        bloom: {
+          DEFAULT: "#EC5A94",
+          soft: "#FCE3EF",
+        },
+        iris: {
+          DEFAULT: "#8B6BF2",
+          soft: "#ECE6FD",
+        },
+        sprout: {
+          DEFAULT: "#2FBD7E",
+          soft: "#DCF6E9",
+        },
       },
       // ---- TYPOGRAPHY ----
       // These names map to fonts we load in layout.tsx via next/font.
@@ -48,7 +66,7 @@ const config: Config = {
         // Monospace — numeric readouts, so measurements look like instrument output.
         mono: ["var(--font-mono)", "monospace"],
       },
-      // A gentle animation used for the hero skeleton pulse.
+      // Gentle animations for the hero skeleton pulse and decorative doodles.
       keyframes: {
         pulseNode: {
           "0%, 100%": { opacity: "0.4", transform: "scale(0.9)" },
@@ -58,10 +76,23 @@ const config: Config = {
           "0%": { strokeDashoffset: "1000" },
           "100%": { strokeDashoffset: "0" },
         },
+        // Slow drift for background gradient blobs — barely-there motion,
+        // just enough to feel alive without being distracting.
+        drift: {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "50%": { transform: "translate(14px, -18px) scale(1.06)" },
+        },
+        // A small playful rock, used on sparkle/star doodles.
+        wiggle: {
+          "0%, 100%": { transform: "rotate(-6deg)" },
+          "50%": { transform: "rotate(6deg)" },
+        },
       },
       animation: {
         pulseNode: "pulseNode 3s ease-in-out infinite",
         drawIn: "drawIn 2s ease-out forwards",
+        drift: "drift 9s ease-in-out infinite",
+        wiggle: "wiggle 4s ease-in-out infinite",
       },
     },
   },
