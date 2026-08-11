@@ -1,10 +1,10 @@
-# ACL MotionCheck
+# VALT (Valgus Analysis & Landing Tracker)
 
 **A web application that analyzes smartphone videos of jump landings and measures
 biomechanical movement patterns associated with ACL injury risk in the sports-science
 literature.**
 
-> ⚠️ **Important scope statement.** ACL MotionCheck does **not** diagnose ACL injuries or
+> ⚠️ **Important scope statement.** VALT does **not** diagnose ACL injuries or
 > any medical condition. It *measures* movement mechanics (knee flexion, dynamic knee
 > valgus, trunk lean, left/right asymmetry, hip position) that injury-prevention research
 > associates with risk. It is an educational and screening-support tool, not a medical

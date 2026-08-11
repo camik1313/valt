@@ -24,7 +24,7 @@ export default function About() {
               biomechanics labs with expensive motion-capture systems.
             </p>
             <p className="mt-4 leading-relaxed text-muted">
-              ACL MotionCheck brings a version of that analysis to any smartphone, so
+              VALT (Valgus Analysis & Landing Tracker) brings a version of that analysis to any smartphone, so
               coaches, athletes, and trainers can start a conversation about movement
               quality — and know when to seek a professional assessment.
             </p>

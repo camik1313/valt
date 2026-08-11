@@ -20,7 +20,7 @@ export default function Navbar() {
             <circle cx="19" cy="19" r="4" fill="#0E7C86" />
           </svg>
           <span className="font-display text-lg font-bold tracking-tight text-ink">
-            ACL MotionCheck
+            VALT
           </span>
         </Link>
 

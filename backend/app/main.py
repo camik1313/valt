@@ -15,7 +15,7 @@ from app.api.routes import upload, analyze, report, history
 # Create the application. The title/description show up in the
 # auto-generated docs at http://localhost:8000/docs.
 app = FastAPI(
-    title="ACL MotionCheck API",
+    title="VALT API",
     description="Measures biomechanical patterns from jump-landing videos. Not a diagnostic tool.",
     version="0.1.0",
 )
@@ -45,13 +45,13 @@ app.include_router(history.router)
 # if the server is alive. Also handy to test the server is up.
 @app.get("/health", tags=["system"])
 async def health():
-    return {"status": "ok", "service": "acl-motioncheck"}
+    return {"status": "ok", "service": "valt"}
 
 
 # A friendly root message so visiting the base URL isn't a 404.
 @app.get("/", tags=["system"])
 async def root():
     return {
-        "message": "ACL MotionCheck API is running.",
+        "message": "VALT API is running.",
         "docs": "/docs",
     }

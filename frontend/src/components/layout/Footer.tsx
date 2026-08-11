@@ -18,7 +18,7 @@ export default function Footer() {
                 <circle cx="7" cy="7" r="4" fill="#132033" />
                 <circle cx="19" cy="19" r="4" fill="#0E7C86" />
               </svg>
-              <span className="font-display font-bold text-ink">ACL MotionCheck</span>
+              <span className="font-display font-bold text-ink">VALT</span>
             </div>
             <p className="mt-3 text-sm text-muted">
               Movement analysis for jump landings, built to support ACL injury-prevention
@@ -46,7 +46,7 @@ export default function Footer() {
         <div className="mt-8 rounded-lg bg-surface p-4">
           <p className="text-xs leading-relaxed text-muted">
             <span className="font-semibold text-ink">Not a medical device.</span>{" "}
-            ACL MotionCheck does not diagnose ACL injuries or any medical condition. It
+            VALT does not diagnose ACL injuries or any medical condition. It
             measures movement mechanics that injury-prevention research associates with
             risk, for educational and screening-support purposes only. Always consult a
             qualified medical professional for health decisions.
@@ -54,7 +54,7 @@ export default function Footer() {
         </div>
 
         <p className="mt-6 text-xs text-muted">
-          © {new Date().getFullYear()} ACL MotionCheck. Built for ISEF &amp; the
+          © {new Date().getFullYear()} VALT. Built for ISEF &amp; the
           Congressional App Challenge.
         </p>
       </div>

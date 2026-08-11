@@ -1,5 +1,5 @@
 {
-  "name": "acl-motioncheck-frontend",
+  "name": "valt-frontend",
   "version": "0.1.0",
   "private": true,
   "//": "The 'scripts' are shortcuts you run with `npm run <name>`.",

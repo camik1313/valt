@@ -2,7 +2,7 @@
 # it reads this file to know how to build and start your backend.
 services:
   - type: web
-    name: acl-motioncheck-backend
+    name: valt-backend
     runtime: python
     # 'rootDir' points Render at the backend/ subfolder of the monorepo.
     rootDir: backend

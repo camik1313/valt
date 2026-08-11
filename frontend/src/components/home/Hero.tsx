@@ -38,7 +38,7 @@ export default function Hero() {
           </h1>
 
           <p className="mt-6 max-w-md text-lg leading-relaxed text-muted">
-            Upload a jump-landing clip. ACL MotionCheck tracks body landmarks and measures
+            Upload a jump-landing clip. VALT tracks body landmarks and measures
             the movement patterns that injury-prevention research links to ACL risk —
             knee flexion, dynamic valgus, trunk lean, and side-to-side asymmetry.
           </p>
