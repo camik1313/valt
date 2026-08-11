@@ -22,6 +22,14 @@ backend/data/analyses/*
 !backend/data/uploads/.gitkeep
 !backend/data/analyses/.gitkeep
 
+# Local test footage — real personal video, never belongs in version control
+backend/scripts/*.mp4
+backend/scripts/*.mov
+backend/scripts/*.MOV
+backend/scripts/*.jpg
+backend/scripts/*.jpeg
+backend/scripts/*.txt
+
 # OS / editor junk
 .DS_Store
 .vscode/
