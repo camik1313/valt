@@ -186,6 +186,39 @@ def test_front_view_pipeline_measures_known_valgus_with_baseline_correction(monk
     assert "knee_flexion_left" not in result.measurements
 
 
+def test_front_view_asymmetry_uses_baseline_corrected_values(monkeypatch):
+    # Regression test: valgus_asymmetry must be computed from the SAME
+    # baseline-corrected numbers reported as knee_valgus_left/right, not
+    # the raw pre-correction landing-frame values. The case above has a
+    # zero standing offset for both legs, so raw and corrected happen to
+    # be identical there and can't tell the two implementations apart.
+    # Here the standing pose already has a nonzero left-knee offset, so
+    # the two computations diverge (100% from raw vs 66.7% from corrected)
+    # and only the corrected one should come out.
+    standing = {
+        L_SHOULDER: (0.4, 0.25, 0.0, 1.0), R_SHOULDER: (0.6, 0.25, 0.0, 1.0),
+        L_HIP: (0.4, 0.50, 0.0, 1.0), R_HIP: (0.6, 0.50, 0.0, 1.0),
+        L_KNEE: (0.42, 0.70, 0.0, 1.0), R_KNEE: (0.6, 0.70, 0.0, 1.0),
+        L_ANKLE: (0.4, 0.90, 0.0, 1.0), R_ANKLE: (0.6, 0.90, 0.0, 1.0),
+    }
+    landing = {
+        L_SHOULDER: (0.4, 0.25, 0.0, 1.0), R_SHOULDER: (0.6, 0.25, 0.0, 1.0),
+        L_HIP: (0.4, 0.50, 0.0, 1.0), R_HIP: (0.6, 0.50, 0.0, 1.0),
+        L_KNEE: (0.46, 0.70, 0.0, 1.0), R_KNEE: (0.58, 0.70, 0.0, 1.0),
+        L_ANKLE: (0.4, 0.90, 0.0, 1.0), R_ANKLE: (0.6, 0.90, 0.0, 1.0),
+    }
+    per_frame = _build_sequence(standing, landing)
+
+    result = _run(per_frame, "front", monkeypatch)
+
+    # Baseline-corrected: left -0.30 - (-0.10) = -0.20, right -0.10 - 0 = -0.10.
+    assert result.measurements["knee_valgus_left"] == pytest.approx(-0.20, abs=0.001)
+    assert result.measurements["knee_valgus_right"] == pytest.approx(-0.10, abs=0.001)
+    # Must match asymmetry_percent(-0.20, -0.10) = 66.7%, reproducible by
+    # hand from the two values above — NOT the raw-value answer (100%).
+    assert result.measurements["valgus_asymmetry"] == pytest.approx(66.7, abs=0.1)
+
+
 def test_front_view_symmetric_landing_reads_zero_valgus_and_asymmetry(monkeypatch):
     pose = {
         L_SHOULDER: (0.4, 0.25, 0.0, 1.0), R_SHOULDER: (0.6, 0.25, 0.0, 1.0),

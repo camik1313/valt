@@ -243,9 +243,14 @@ def run_pipeline(seed: str, video_path: str, view: str = VIEW_FRONT) -> Pipeline
                 landing_valgus["right"] - base_valgus["right"], 3
             )
         if "knee_valgus_left" in measurements and "knee_valgus_right" in measurements:
+            # Computed from the SAME baseline-corrected values reported above
+            # (not the raw landing_valgus) so the percentage a reader sees is
+            # always reproducible by hand from the two numbers next to it.
+            # When there's no baseline, correction is a no-op (subtracts 0),
+            # so this is identical to using raw values in that case.
             measurements["valgus_asymmetry"] = round(
                 metrics.asymmetry_percent(
-                    landing_valgus["left"], landing_valgus["right"]
+                    measurements["knee_valgus_left"], measurements["knee_valgus_right"]
                 ), 1,
             )
         else:
