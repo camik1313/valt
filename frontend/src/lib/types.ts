@@ -25,10 +25,10 @@ export type CameraView = "front" | "side";
 // SCREENING RISK SCORE — mirrors backend/app/risk/scoring.py and
 // backend/app/models/schemas.py. See scoring.py for the full "what this
 // is and isn't" explanation: NOT a diagnosis, NOT a trained model, NEVER
-// an injury probability — just a transparent points-based checklist over
-// (a) the biomechanical error criteria this app's 2D pipeline can measure
-// (a LESS-inspired SUBSET, not the full 17-item LESS) and (b) an optional
-// self-report questionnaire.
+// an injury probability. This is a small set of illustrative biomechanical
+// checks PLUS a real, cited epidemiological questionnaire (prior injury,
+// sex, sport, age, activity level, fatigue) — general risk-factor context
+// that sits alongside, but is not part of, the LESS score below.
 // ============================================================
 
 // The optional self-report questionnaire. Every field is optional —
@@ -82,6 +82,47 @@ export type RiskScore = {
   disclaimer: string;
 };
 
+// ============================================================
+// LESS (Landing Error Scoring System) — mirrors backend/app/risk/less.py.
+// This is the REAL, cited 17-item LESS, not an inspired subset. See
+// less.py's module docstring for the full citations and for exactly
+// which items are measured from video vs. self-reported (foot rotation
+// x2 and "overall impression" — items no 2D camera can resolve).
+// ============================================================
+
+// The 3 LESS items no camera can score. Every field optional — leave
+// unanswered fields out and those items just won't count toward the total.
+export type LessQuestionnaireAnswers = {
+  footIrMaxFlexion?: boolean | null;   // item 13: toes turned in >30° at max flexion?
+  footErMaxFlexion?: boolean | null;   // item 14: toes turned out >30° at max flexion?
+  overallImpression?: "excellent" | "average" | "poor" | null;  // item 17
+};
+
+// One of the 17 LESS items, scored.
+export type LessItemScore = {
+  number: number;            // 1-17, matching the official scoring sheet
+  key: string;
+  view: "sagittal" | "frontal" | "overall";
+  label: string;              // the official sheet's short name
+  goodCriterion: string;      // the official sheet's "no error" description
+  points: number;
+  maxPoints: number;
+  source: "measured" | "self_reported" | "unavailable";
+  detail: string;             // plain-language explanation of this item's score
+};
+
+// The full LESS result attached to an Analysis.
+export type LessScore = {
+  totalPoints: number;
+  maxPoints: number;         // only items THIS session could score count
+  percentOfMax: number;
+  band: "low" | "moderate" | "high";
+  items: LessItemScore[];
+  viewsAvailable: string[];   // which of "front"/"side" contributed
+  disclaimer: string;
+  cutoffCitation: string;
+};
+
 // A single completed analysis of one video.
 export type Analysis = {
   id: string;
@@ -96,6 +137,8 @@ export type Analysis = {
   // null when the real pipeline didn't run (e.g. mock fallback) — there
   // are no real measurements to screen in that case.
   riskScore: RiskScore | null;
+  // The real, cited LESS score. Also null on mock fallback.
+  lessScore: LessScore | null;
 };
 
 // The status the upload screen moves through.

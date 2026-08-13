@@ -1,10 +1,13 @@
 // ============================================================
-// RiskScoreCard.tsx — displays the SCREENING risk score on the report page.
+// RiskScoreCard.tsx — displays the epidemiological SCREENING risk score
+// on the report page. This is DIFFERENT from LessScoreCard.tsx: this one
+// covers general risk-factor context (prior injury, sex, sport, age,
+// activity level, fatigue) plus a small illustrative biomechanical check
+// — it is NOT the LESS assessment (see LessScoreCard.tsx / risk/less.py
+// for the real, cited 17-item tool).
 //
 // CRITICAL FRAMING (see backend/app/risk/scoring.py for the full version):
-// this is a transparent, literature-informed screening checklist over a
-// LESS-inspired SUBSET of biomechanical criteria this app's 2D pipeline
-// can measure, plus an optional self-report questionnaire. It is NOT a
+// this is a transparent, literature-informed screening checklist, not a
 // diagnosis, NOT a trained model, and NEVER an injury probability. That
 // framing is repeated here deliberately rather than assumed — this is
 // the component someone will screenshot.
@@ -23,10 +26,10 @@ export default function RiskScoreCard({ riskScore }: { riskScore: RiskScore | nu
     return (
       <div className="rounded-2xl border border-line bg-white p-6">
         <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted">
-          Screening risk score
+          Risk factor screening
         </h2>
         <p className="mt-2 text-sm text-muted">
-          No screening score is available for this analysis — it requires real
+          No screening score is available for this analysis. It requires real
           measurements from the video, and this result used simulated
           placeholder data instead.
         </p>
@@ -40,7 +43,7 @@ export default function RiskScoreCard({ riskScore }: { riskScore: RiskScore | nu
     <div className="rounded-2xl border border-line bg-white p-6">
       <div className="flex items-start justify-between gap-3">
         <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted">
-          Screening risk score
+          Risk factor screening
         </h2>
         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${band.badge} ${band.text}`}>
           {band.label}
@@ -81,7 +84,7 @@ export default function RiskScoreCard({ riskScore }: { riskScore: RiskScore | nu
           <div className="rounded-lg border border-dashed border-line p-3">
             <p className="text-xs font-medium text-ink">From questionnaire</p>
             <p className="mt-1 text-xs text-muted">
-              Not completed — score reflects the biomechanical portion only.
+              Not completed. Score reflects the biomechanical portion only.
             </p>
           </div>
         )}
@@ -107,7 +110,7 @@ export default function RiskScoreCard({ riskScore }: { riskScore: RiskScore | nu
         </div>
       ) : (
         <p className="mt-5 text-sm text-muted">
-          No screening criteria were triggered — no factors to list.
+          No screening criteria were triggered, so there are no factors to list.
         </p>
       )}
     </div>

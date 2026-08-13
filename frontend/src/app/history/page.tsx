@@ -46,7 +46,7 @@ export default function HistoryPage() {
           </h1>
           <p className="mt-1 text-muted">Every saved analysis, newest first.</p>
         </div>
-        <Button href="/analyze" variant="primary" className="!px-5 !py-2">New analysis</Button>
+        <Button href="/capture" variant="primary" className="!px-5 !py-2">Record a video</Button>
       </div>
 
       {/* Loading */}
@@ -69,9 +69,9 @@ export default function HistoryPage() {
       {!loading && !error && items.length === 0 && (
         <div className="rounded-2xl border border-dashed border-line bg-white p-12 text-center">
           <p className="font-display text-lg font-semibold text-ink">No analyses yet</p>
-          <p className="mt-1 text-sm text-muted">Upload a jump-landing video to see it here.</p>
+          <p className="mt-1 text-sm text-muted">Record a jump-landing video to see it here.</p>
           <div className="mt-5">
-            <Button href="/analyze" variant="primary">Analyze a video</Button>
+            <Button href="/capture" variant="primary">Record a video</Button>
           </div>
         </div>
       )}

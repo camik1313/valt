@@ -17,6 +17,7 @@ import { getReport } from "@/lib/api";
 import MetricCard from "@/components/report/MetricCard";
 import ReportChart from "@/components/report/ReportChart";
 import RiskScoreCard from "@/components/risk/RiskScoreCard";
+import LessScoreCard from "@/components/risk/LessScoreCard";
 import Button from "@/components/ui/Button";
 
 export default function ReportPage({ params }: { params: { id: string } }) {
@@ -63,7 +64,7 @@ export default function ReportPage({ params }: { params: { id: string } }) {
         <h1 className="font-display text-2xl font-bold text-ink">Report not found</h1>
         <p className="mt-2 text-sm text-muted">{error ?? "That analysis doesn't exist."}</p>
         <div className="mt-6">
-          <Button href="/analyze" variant="primary">Analyze a video</Button>
+          <Button href="/capture" variant="primary">Record a video</Button>
         </div>
       </section>
     );
@@ -92,7 +93,7 @@ export default function ReportPage({ params }: { params: { id: string } }) {
         <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted">
           Summary
         </h2>
-        <p className="mt-2 leading-relaxed text-ink">{analysis.summary}</p>
+        <p className="mt-2 whitespace-pre-line leading-relaxed text-ink">{analysis.summary}</p>
       </div>
 
       {/* Chart */}
@@ -108,7 +109,12 @@ export default function ReportPage({ params }: { params: { id: string } }) {
         ))}
       </div>
 
-      {/* Screening risk score */}
+      {/* LESS score — the real, cited 17-item assessment */}
+      <div className="mt-8">
+        <LessScoreCard lessScore={analysis.lessScore} />
+      </div>
+
+      {/* Epidemiological risk-factor screening (separate from LESS) */}
       <div className="mt-8">
         <RiskScoreCard riskScore={analysis.riskScore} />
       </div>
@@ -124,7 +130,7 @@ export default function ReportPage({ params }: { params: { id: string } }) {
       </div>
 
       <div className="mt-6 flex gap-3">
-        <Button href="/analyze" variant="primary">Analyze another</Button>
+        <Button href="/capture" variant="primary">Record another</Button>
         <Button href="/history" variant="outline">View history</Button>
       </div>
     </section>

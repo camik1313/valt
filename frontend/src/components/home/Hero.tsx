@@ -69,16 +69,13 @@ export default function Hero() {
 
           <p className="mt-6 max-w-md text-lg leading-relaxed text-muted">
             Upload a jump-landing clip. VALT tracks body landmarks and measures
-            the movement patterns that injury-prevention research links to ACL risk —
-            knee flexion, dynamic valgus, trunk lean, and side-to-side asymmetry.
+            the movement patterns that injury-prevention research links to ACL risk,
+            including knee flexion, dynamic valgus, trunk lean, and side-to-side asymmetry.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <Button href="/analyze" variant="primary">
-              Analyze a video →
-            </Button>
-            <Button href="/capture" variant="outline">
-              Record with guided capture
+            <Button href="/capture" variant="primary">
+              Record with guided capture →
             </Button>
             <Button href="/#how" variant="outline">
               See how it works

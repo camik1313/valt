@@ -15,13 +15,15 @@ type ButtonProps = {
   onClick?: () => void;
   className?: string;
   type?: "button" | "submit";
+  disabled?: boolean;                // only applies to the <button> form, not href links
 };
 
 // Shared base styles for every button.
 const base =
   "inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 " +
   "font-body font-medium text-sm transition-all duration-200 " +
-  "focus:outline-none focus-visible:ring-2 focus-visible:ring-track focus-visible:ring-offset-2";
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-track focus-visible:ring-offset-2 " +
+  "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:shadow-none";
 
 // Variant-specific styles.
 const variants = {
@@ -36,6 +38,7 @@ export default function Button({
   onClick,
   className = "",
   type = "button",
+  disabled = false,
 }: ButtonProps) {
   const classes = `${base} ${variants[variant]} ${className}`;
 
@@ -49,7 +52,7 @@ export default function Button({
   }
 
   return (
-    <button type={type} onClick={onClick} className={classes}>
+    <button type={type} onClick={onClick} disabled={disabled} className={classes}>
       {children}
     </button>
   );

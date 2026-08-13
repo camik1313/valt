@@ -45,6 +45,7 @@ async def analyze_video(request: AnalyzeRequest):
         video_path=video_path,
         view=request.view,
         questionnaire=request.questionnaire,
+        less_questionnaire=request.less_questionnaire,
         side_video_path=side_video_path,
         side_video_filename=side_video_filename,
     )

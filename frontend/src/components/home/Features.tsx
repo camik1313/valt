@@ -19,7 +19,7 @@ const metrics = [
   },
   {
     title: "Dynamic knee valgus",
-    body: "Inward collapse of the knee relative to hip and ankle — one of the most-studied ACL-risk patterns.",
+    body: "Inward collapse of the knee relative to hip and ankle. One of the most-studied ACL-risk patterns.",
     hue: "iris" as const,
   },
   {

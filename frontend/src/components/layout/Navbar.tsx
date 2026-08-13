@@ -35,11 +35,14 @@ export default function Navbar() {
           <Link href="/#about" className="text-sm text-muted transition-colors hover:text-ink">
             About
           </Link>
+          <Link href="/why" className="text-sm text-muted transition-colors hover:text-ink">
+            Why VALT
+          </Link>
         </div>
 
         {/* ---- Primary action ---- */}
-        <Button href="/analyze" variant="primary" className="!px-5 !py-2">
-          Analyze a video
+        <Button href="/capture" variant="primary" className="!px-5 !py-2">
+          Record a video
         </Button>
       </nav>
     </header>

@@ -223,7 +223,7 @@ class QuestionnaireAnswers:
 
 PREVIOUS_ACL_INJURY_POINTS = 4.0
 PREVIOUS_ACL_INJURY_CITATION = (
-    "Illustrative weight — prior ACL injury is the single strongest known risk "
+    "Illustrative weight. Prior ACL injury is the single strongest known risk "
     "factor for a subsequent ACL injury (ipsilateral graft or contralateral); "
     "roughly 1 in 4 young athletes sustain a second ACL injury within 24 months "
     "of return to sport (Paterno et al. 2014; Wiggins et al. 2016 meta-analysis)."
@@ -231,7 +231,7 @@ PREVIOUS_ACL_INJURY_CITATION = (
 
 FEMALE_SEX_POINTS = 2.0
 FEMALE_SEX_CITATION = (
-    "Illustrative weight — female athletes in pivoting/cutting sports show "
+    "Illustrative weight. Female athletes in pivoting/cutting sports show "
     "consistently higher non-contact ACL injury incidence than male athletes in "
     "the same sports in epidemiological studies (Prodromos et al. 2007 "
     "meta-analysis; Renstrom et al. 2008 IOC consensus statement). This reflects "
@@ -245,7 +245,7 @@ SPORT_TYPE_POINTS: dict[SportType, float] = {
     "other": 0.0,
 }
 SPORT_TYPE_CITATION = (
-    "Illustrative weights — pivoting/cutting sports carry substantially higher "
+    "Illustrative weights. Pivoting/cutting sports carry substantially higher "
     "reported ACL injury rates than straight-line endurance sports (Agel et al. "
     "2005; Waldén et al. 2011)."
 )
@@ -254,7 +254,7 @@ AGE_HIGH_INCIDENCE_MIN = 14
 AGE_HIGH_INCIDENCE_MAX = 25
 AGE_HIGH_INCIDENCE_POINTS = 1.0
 AGE_CITATION = (
-    "Illustrative weight — reported ACL injury incidence rises sharply in "
+    "Illustrative weight. Reported ACL injury incidence rises sharply in "
     "adolescence and stays elevated through the mid-20s in athletic populations "
     "(Beynnon et al. 2014; Shea et al. pediatric/adolescent incidence data), "
     "before declining. This is a population pattern, not an individual one."
@@ -262,21 +262,21 @@ AGE_CITATION = (
 
 COMPETITIVE_ACTIVITY_POINTS = 1.5
 COMPETITIVE_ACTIVITY_CITATION = (
-    "Illustrative weight — higher competitive exposure (more games/practices at "
+    "Illustrative weight. Higher competitive exposure (more games/practices at "
     "a competitive level) means more at-risk landing/cutting exposures over time "
     "(Gornitzky et al. 2016 incidence-by-exposure analysis)."
 )
 
 FATIGUE_POINTS = 1.0
 FATIGUE_CITATION = (
-    "Illustrative weight — neuromuscular control of landing mechanics "
+    "Illustrative weight. Neuromuscular control of landing mechanics "
     "deteriorates under fatigue in laboratory studies (Chappell et al. 2005; "
     "Borotikar et al. 2008)."
 )
 
 PREVIOUS_LOWER_LIMB_INJURY_POINTS = 1.0
 PREVIOUS_LOWER_LIMB_INJURY_CITATION = (
-    "Illustrative weight — a prior lower-limb injury (e.g. ankle sprain) is a "
+    "Illustrative weight. A prior lower-limb injury (e.g. ankle sprain) is a "
     "general marker of elevated future lower-limb injury risk in systematic "
     "reviews (Swart et al. 2014), independent of ACL-specific mechanisms."
 )
@@ -376,7 +376,7 @@ def score_biomechanics(measurements: dict[str, float]) -> BiomechScore:
                 points=criterion.points,
                 detail=(
                     f"{criterion.label}: measured {value:g} {criterion.unit} "
-                    f"({comparison} {criterion.unit} screening threshold) — "
+                    f"({comparison} {criterion.unit} screening threshold), "
                     f"+{criterion.points:g} pts."
                 ),
             ))
@@ -409,7 +409,7 @@ def score_questionnaire(answers: QuestionnaireAnswers | None) -> QuestionnaireSc
                 label="Previous ACL injury",
                 points=PREVIOUS_ACL_INJURY_POINTS,
                 detail=(
-                    f"Reported a previous ACL injury — "
+                    f"Reported a previous ACL injury, "
                     f"+{PREVIOUS_ACL_INJURY_POINTS:g} pts. {PREVIOUS_ACL_INJURY_CITATION}"
                 ),
             ))
@@ -423,7 +423,7 @@ def score_questionnaire(answers: QuestionnaireAnswers | None) -> QuestionnaireSc
                 label="Sex (epidemiological factor)",
                 points=FEMALE_SEX_POINTS,
                 detail=(
-                    f"Reported sex: female — +{FEMALE_SEX_POINTS:g} pts. "
+                    f"Reported sex: female, +{FEMALE_SEX_POINTS:g} pts. "
                     f"{FEMALE_SEX_CITATION}"
                 ),
             ))
@@ -438,7 +438,7 @@ def score_questionnaire(answers: QuestionnaireAnswers | None) -> QuestionnaireSc
                 label="Sport type",
                 points=sport_points,
                 detail=(
-                    f"Reported sport type: {answers.sport_type} — "
+                    f"Reported sport type: {answers.sport_type}, "
                     f"+{sport_points:g} pts. {SPORT_TYPE_CITATION}"
                 ),
             ))
@@ -454,7 +454,7 @@ def score_questionnaire(answers: QuestionnaireAnswers | None) -> QuestionnaireSc
                 detail=(
                     f"Reported age {answers.age} falls in the "
                     f"{AGE_HIGH_INCIDENCE_MIN}-{AGE_HIGH_INCIDENCE_MAX} higher-incidence "
-                    f"range — +{AGE_HIGH_INCIDENCE_POINTS:g} pts. {AGE_CITATION}"
+                    f"range, +{AGE_HIGH_INCIDENCE_POINTS:g} pts. {AGE_CITATION}"
                 ),
             ))
 
@@ -467,7 +467,7 @@ def score_questionnaire(answers: QuestionnaireAnswers | None) -> QuestionnaireSc
                 label="Activity / competition level",
                 points=COMPETITIVE_ACTIVITY_POINTS,
                 detail=(
-                    f"Reported activity level: {answers.activity_level} — "
+                    f"Reported activity level: {answers.activity_level}, "
                     f"+{COMPETITIVE_ACTIVITY_POINTS:g} pts. {COMPETITIVE_ACTIVITY_CITATION}"
                 ),
             ))
@@ -480,7 +480,7 @@ def score_questionnaire(answers: QuestionnaireAnswers | None) -> QuestionnaireSc
                 key="fatigue_reported",
                 label="Reported fatigue",
                 points=FATIGUE_POINTS,
-                detail=f"Reported fatigue — +{FATIGUE_POINTS:g} pts. {FATIGUE_CITATION}",
+                detail=f"Reported fatigue, +{FATIGUE_POINTS:g} pts. {FATIGUE_CITATION}",
             ))
 
     if answers.previous_lower_limb_injury is not None:
@@ -492,7 +492,7 @@ def score_questionnaire(answers: QuestionnaireAnswers | None) -> QuestionnaireSc
                 label="Previous lower-limb injury (non-ACL)",
                 points=PREVIOUS_LOWER_LIMB_INJURY_POINTS,
                 detail=(
-                    f"Reported a previous lower-limb injury — "
+                    f"Reported a previous lower-limb injury, "
                     f"+{PREVIOUS_LOWER_LIMB_INJURY_POINTS:g} pts. "
                     f"{PREVIOUS_LOWER_LIMB_INJURY_CITATION}"
                 ),

@@ -4,6 +4,7 @@
 // clear about scope and limitations is a strength, not a weakness.
 // ============================================================
 
+import Link from "next/link";
 import { GradientBlob } from "@/components/decor/Doodles";
 
 export default function About() {
@@ -37,14 +38,20 @@ export default function About() {
             <p className="mt-4 leading-relaxed text-muted">
               VALT (Valgus Analysis & Landing Tracker) brings a version of that analysis to any smartphone, so
               coaches, athletes, and trainers can start a conversation about movement
-              quality — and know when to seek a professional assessment.
+              quality, and know when to seek a professional assessment.
             </p>
+            <Link
+              href="/why"
+              className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-track hover:underline"
+            >
+              See the research behind this, and what LESS actually is →
+            </Link>
           </div>
 
           {/* Scope / honesty panel */}
           <div className="rounded-2xl border border-risk/30 bg-risk-soft/40 p-8">
             <h3 className="font-display text-lg font-semibold text-ink">
-              What this tool is — and isn't
+              What this tool is, and isn&apos;t
             </h3>
             <ul className="mt-4 space-y-4 text-sm leading-relaxed text-ink/80">
               <li className="flex gap-3">

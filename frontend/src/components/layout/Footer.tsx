@@ -34,11 +34,12 @@ export default function Footer() {
               <span className="font-medium text-ink">Product</span>
               <a href="/#how" className="text-muted hover:text-ink">How it works</a>
               <a href="/#features" className="text-muted hover:text-ink">Features</a>
-              <a href="/analyze" className="text-muted hover:text-ink">Analyze a video</a>
+              <a href="/capture" className="text-muted hover:text-ink">Record a video</a>
             </div>
             <div className="flex flex-col gap-2">
               <span className="font-medium text-ink">Project</span>
               <a href="/#about" className="text-muted hover:text-ink">About</a>
+              <a href="/why" className="text-muted hover:text-ink">Why VALT</a>
               <a href="/history" className="text-muted hover:text-ink">History</a>
             </div>
           </div>

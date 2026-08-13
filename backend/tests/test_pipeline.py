@@ -233,3 +233,85 @@ def test_front_view_symmetric_landing_reads_zero_valgus_and_asymmetry(monkeypatc
     assert result.measurements["knee_valgus_left"] == pytest.approx(0.0, abs=0.001)
     assert result.measurements["knee_valgus_right"] == pytest.approx(0.0, abs=0.001)
     assert result.measurements["valgus_asymmetry"] == pytest.approx(0.0, abs=0.01)
+
+
+# ============================================================
+# LESS (Landing Error Scoring System) raw measurements.
+#
+# _build_sequence() above can't test the initial-contact-vs-max-flexion
+# split: it transitions every landmark at the same single frame boundary,
+# so ankle and hip always "settle" together. Real landings don't work
+# that way — the feet stop descending (touch down) before the hip
+# finishes flexing into the squat — so this test uses a bespoke sequence
+# where the ankle plants and goes flat several frames before the hip
+# does, and checks that initial_contact_frame lands meaningfully earlier
+# than landing_frame (max flexion) as a result.
+# ============================================================
+
+def _less_test_frame(hip_y: float, ankle_y: float, knee_offset_x: float = 0.0):
+    return {
+        L_SHOULDER: (0.5, 0.25, 0.0, 1.0), R_SHOULDER: (0.5, 0.25, 0.0, 1.0),
+        L_HIP: (0.5, hip_y, 0.0, 1.0), R_HIP: (0.5, hip_y, 0.0, 1.0),
+        L_KNEE: (0.5 + knee_offset_x, 0.70, 0.0, 1.0), R_KNEE: (0.5 + knee_offset_x, 0.70, 0.0, 1.0),
+        L_ANKLE: (0.5, ankle_y, 0.0, 1.0), R_ANKLE: (0.5, ankle_y, 0.0, 1.0),
+    }
+
+
+def test_initial_contact_detected_before_max_flexion_when_separable(monkeypatch):
+    frames = []
+    # Standing (10 frames): hip=0.50, ankle=0.90, straight leg.
+    for _ in range(10):
+        frames.append(_full_frame(_less_test_frame(0.50, 0.90)))
+    # Airborne (10 frames): hip and ankle rise together (0.50->0.30, 0.90->0.75).
+    for i in range(10):
+        t = (i + 1) / 10
+        frames.append(_full_frame(_less_test_frame(0.50 - t * 0.20, 0.90 - t * 0.15)))
+    # Feet land (ankle flat at 0.90) while the hip KEEPS descending for 10
+    # more frames (0.30 -> 0.65) — the real gap between the two events.
+    for i in range(10):
+        t = (i + 1) / 10
+        frames.append(_full_frame(_less_test_frame(0.30 + t * 0.35, 0.90, knee_offset_x=0.05 * t)))
+    # Deep-flexion plateau, fully held (20 frames).
+    for _ in range(20):
+        frames.append(_full_frame(_less_test_frame(0.65, 0.90, knee_offset_x=0.05)))
+
+    result = _run(frames, "side", monkeypatch)
+
+    assert result.initial_contact_frame is not None
+    # A real, non-trivial gap — not just off-by-one from smoothing.
+    assert result.initial_contact_frame < result.landing_frame - 2
+
+    # Knee flexion at initial contact should be near-straight (knee_offset_x
+    # ~0 there), and displacement to max flexion should be a real, non-zero
+    # bend (knee_offset_x grows to 0.05 by the deep-flexion plateau).
+    assert "less_knee_flexion_ic_left" in result.less_raw
+    assert "less_knee_flexion_displacement_left" in result.less_raw
+    assert result.less_raw["less_knee_flexion_ic_left"] < 15.0
+    assert result.less_raw["less_knee_flexion_displacement_left"] > 5.0
+
+
+def test_front_view_less_raw_includes_stance_and_contact_symmetry(monkeypatch):
+    standing = {
+        L_SHOULDER: (0.4, 0.25, 0.0, 1.0), R_SHOULDER: (0.6, 0.25, 0.0, 1.0),
+        L_HIP: (0.4, 0.50, 0.0, 1.0), R_HIP: (0.6, 0.50, 0.0, 1.0),
+        L_KNEE: (0.4, 0.70, 0.0, 1.0), R_KNEE: (0.6, 0.70, 0.0, 1.0),
+        L_ANKLE: (0.4, 0.90, 0.0, 1.0), R_ANKLE: (0.6, 0.90, 0.0, 1.0),
+    }
+    landing = {
+        L_SHOULDER: (0.4, 0.25, 0.0, 1.0), R_SHOULDER: (0.6, 0.25, 0.0, 1.0),
+        L_HIP: (0.4, 0.50, 0.0, 1.0), R_HIP: (0.6, 0.50, 0.0, 1.0),
+        L_KNEE: (0.44, 0.70, 0.0, 1.0), R_KNEE: (0.58, 0.70, 0.0, 1.0),
+        L_ANKLE: (0.4, 0.90, 0.0, 1.0), R_ANKLE: (0.6, 0.90, 0.0, 1.0),
+    }
+    per_frame = _build_sequence(standing, landing)
+
+    result = _run(per_frame, "front", monkeypatch)
+
+    # These LESS items don't depend on IC/max-flexion separation, so the
+    # existing (same-frame) builder is fine for checking they're present
+    # and sane.
+    assert "less_stance_width_ratio_ic" in result.less_raw
+    assert result.less_raw["less_stance_width_ratio_ic"] == pytest.approx(1.0, abs=0.01)
+    assert "less_foot_contact_asymmetry_frames" in result.less_raw
+    assert "less_trunk_lateral_ic" in result.less_raw
+    assert "less_knee_valgus_ic_left" in result.less_raw

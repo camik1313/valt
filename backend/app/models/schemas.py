@@ -89,6 +89,47 @@ class RiskScore(CamelModel):
     disclaimer: str
 
 
+# ============================================================
+# LESS (Landing Error Scoring System) — see backend/app/risk/less.py
+# for the full explanation, citations, and every threshold's source.
+# This is the REAL, cited 17-item LESS, not an inspired subset.
+# ============================================================
+
+OverallImpression = Literal["excellent", "average", "poor"]
+
+
+# ---- The 3 items no 2D camera can score (self-reported) ----
+class LessQuestionnaireAnswers(CamelModel):
+    foot_ir_max_flexion: bool | None = None   # item 13: toes turned in >30° at max flexion?
+    foot_er_max_flexion: bool | None = None   # item 14: toes turned out >30° at max flexion?
+    overall_impression: OverallImpression | None = None  # item 17
+
+
+# ---- One of the 17 LESS items, scored ----
+class LessItemScore(CamelModel):
+    number: int              # 1-17, matching the official scoring sheet
+    key: str
+    view: Literal["sagittal", "frontal", "overall"]
+    label: str                # the official sheet's short name
+    good_criterion: str       # the official sheet's "no error" description
+    points: int
+    max_points: int
+    source: Literal["measured", "self_reported", "unavailable"]
+    detail: str                # plain-language explanation of this item's score
+
+
+# ---- The full LESS result attached to an Analysis ----
+class LessScore(CamelModel):
+    total_points: float
+    max_points: float          # only items THIS session could score count
+    percent_of_max: float
+    band: Literal["low", "moderate", "high"]
+    items: list[LessItemScore]
+    views_available: list[str]   # which of "front"/"side" contributed
+    disclaimer: str
+    cutoff_citation: str
+
+
 # ---- A complete analysis of one video ----
 class Analysis(CamelModel):
     id: str
@@ -103,6 +144,8 @@ class Analysis(CamelModel):
     # None when the real pipeline didn't run (e.g. mock fallback) — there are
     # no real measurements to screen in that case, so we don't fabricate one.
     risk_score: RiskScore | None = None
+    # The real, cited LESS score (see risk/less.py). Also None on mock fallback.
+    less_score: LessScore | None = None
 
 
 # ---- Response after uploading a video ----
@@ -128,6 +171,10 @@ class AnalyzeRequest(CamelModel):
     # Optional screening questionnaire. Omit entirely (or send null) to skip
     # it — the resulting risk score then reports the biomechanical portion only.
     questionnaire: QuestionnaireAnswers | None = None
+    # Optional answers to the 3 LESS items no camera can score (foot
+    # rotation x2, overall impression). Omit to skip — those 3 items just
+    # won't count toward the LESS total.
+    less_questionnaire: LessQuestionnaireAnswers | None = None
 
 
 # ---- A short entry for the history list ----

@@ -1,13 +1,24 @@
 // ============================================================
-// capture/page.tsx — GUIDED VIDEO CAPTURE.
+// capture/page.tsx — GUIDED VIDEO CAPTURE. This is the ONLY way to
+// submit a video in this app — there is no separate "upload a file"
+// entry point in normal use (see /analyze, which still exists only as
+// a fallback if camera access genuinely fails).
 //
-// Records a jump-landing video in the browser with on-screen guidance
-// so the clip ALWAYS has the structure the science needs:
-//   [ stand still (baseline) ] -> [ JUMP ] -> [ landing ]
+// Records a jump-landing video in the browser with on-screen (and now
+// audible) guidance so the clip ALWAYS has the structure the science
+// needs:
+//   [ stand still (baseline) ] -> [ JUMP ] -> [ hold the landing ]
 //
 // The standing segment at the start is exactly what the backend's
 // auto-baseline detector looks for — so guided captures get
 // perspective-corrected valgus automatically.
+//
+// FULLY AUTOMATIC RECORDING: there's no "Stop recording" button anymore.
+// The JUMP cue holds for roughly as long as an average jump takes (reaction
+// + takeoff + brief airborne time), then the app automatically guides a
+// short "hold your landing" period and stops recording on its own — one
+// less thing to fumble with mid-jump. Short beeps mark each countdown
+// step and phase change so you don't have to watch the screen closely.
 //
 // TWO-ANGLE SESSION: after the first clip, the athlete is guided to turn
 // 90° (camera stays put) and record a second clip from the OPPOSITE angle
@@ -19,18 +30,21 @@
 //
 // FLOW (state machine in `phase`, `clipIndex` tracks which of the up-to-2
 // clips is currently being recorded/reviewed):
-//   setup       -> checklist + athlete name + starting angle, then "Open camera"
-//   ready       -> live camera preview, "Start recording"
-//   positioning -> ~5s to walk into frame (NOT yet recording)
-//   standing    -> 3s "stand still" countdown (recording starts here)
-//   jump        -> big "JUMP!" cue, recording continues, user taps Stop
-//   review      -> play back the clip; continue/retake/skip
-//   transition  -> guided "turn to the other angle" instructions (clip 1 -> 2 only)
+//   setup         -> checklist + athlete name + starting angle, then "Open camera"
+//   ready         -> live camera preview (flip front/back here), "Start recording"
+//   positioning   -> ~5s to walk into frame (NOT yet recording), beeps each second
+//   standing      -> 3s "stand still" countdown (recording starts here), beeps
+//   jump          -> big "JUMP!" cue, auto-timed to ~an average jump, then auto-advances
+//   hold          -> "hold your landing" cue, auto-timed, then auto-stops recording
+//   review        -> play back the clip; continue/retake/skip
+//   transition    -> guided "turn to the other angle" instructions (clip 1 -> 2 only)
+//   questionnaire -> ONE required questionnaire, asked once you've seen your landing
 //   uploading / processing -> hand off to the existing analyze pipeline
-//   error       -> camera or analysis problem
+//   error         -> camera or analysis problem (only place /analyze is offered, as a fallback)
 //
-// Uses the browser MediaRecorder + getUserMedia APIs. Requires HTTPS in
-// production (localhost is exempt for local testing).
+// Uses the browser MediaRecorder + getUserMedia APIs, plus the Web Audio
+// API for the countdown beeps (synthesized, no audio file needed).
+// Requires HTTPS in production (localhost is exempt for local testing).
 // ============================================================
 "use client";
 
@@ -38,10 +52,13 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
-import { CameraView, ProcessingStage, QuestionnaireAnswers } from "@/lib/types";
+import { CameraView, ProcessingStage } from "@/lib/types";
 import { uploadVideo, analyzeVideo } from "@/lib/api";
 import ProcessingStatus from "@/components/upload/ProcessingStatus";
-import QuestionnaireForm, { hasAnyAnswer } from "@/components/questionnaire/QuestionnaireForm";
+import RequiredQuestionnaire, {
+  RequiredAnswers,
+  isQuestionnaireComplete,
+} from "@/components/questionnaire/RequiredQuestionnaire";
 
 type Phase =
   | "setup"
@@ -49,20 +66,36 @@ type Phase =
   | "positioning"
   | "standing"
   | "jump"
+  | "hold"
   | "review"
   | "transition"
+  | "questionnaire"
   | "uploading"
   | "processing"
   | "error";
 
 type RecordedClip = { blob: Blob; url: string; ext: string };
+type FacingMode = "environment" | "user";
 
 // Timing for the guided phases (seconds).
-const POSITION_SECONDS = 5; // time to walk into frame after tapping record
-const STANDING_SECONDS = 3; // baseline period that must be recorded
+const POSITION_SECONDS = 5;  // time to walk into frame after tapping record
+const STANDING_SECONDS = 3;  // baseline period that must be recorded
+const JUMP_SECONDS = 1.3;    // roughly the reaction + takeoff + airborne time of an average jump
+const HOLD_SECONDS = 2;      // stay still after landing so the frame the pipeline needs is clean
 
 function viewLabel(v: CameraView): string {
   return v === "front" ? "front-on" : "side-on";
+}
+
+// ---- Web Audio beeps (synthesized — no audio file needed) ----
+type AudioContextConstructor = typeof AudioContext;
+
+function getAudioContextConstructor(): AudioContextConstructor | undefined {
+  if (typeof window === "undefined") return undefined;
+  return (
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: AudioContextConstructor }).webkitAudioContext
+  );
 }
 
 export default function CapturePage() {
@@ -72,8 +105,9 @@ export default function CapturePage() {
   const [athleteName, setAthleteName] = useState("Athlete");
   const [view, setView] = useState<CameraView>("front"); // starting angle (clip 1)
   const [clipIndex, setClipIndex] = useState<0 | 1>(0);
-  const [showQuestionnaire, setShowQuestionnaire] = useState(false);
-  const [questionnaire, setQuestionnaire] = useState<QuestionnaireAnswers>({});
+  const [facing, setFacing] = useState<FacingMode>("environment");
+  const [requiredAnswers, setRequiredAnswers] = useState<RequiredAnswers>({});
+  const [pendingIncludeSecond, setPendingIncludeSecond] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
@@ -87,6 +121,7 @@ export default function CapturePage() {
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   // Up to two recorded clips, indexed by clipIndex (0 = starting angle, 1 = opposite angle).
   const clipsRef = useRef<(RecordedClip | undefined)[]>([undefined, undefined]);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -97,6 +132,7 @@ export default function CapturePage() {
       stopStream();
       timersRef.current.forEach(clearTimeout);
       clipsRef.current.forEach((c) => c && URL.revokeObjectURL(c.url));
+      audioCtxRef.current?.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -113,20 +149,50 @@ export default function CapturePage() {
   // since openCamera() (which sets srcObject) only runs once, before clip 1.
   useEffect(() => {
     const isCameraPhase =
-      phase === "ready" || phase === "positioning" || phase === "standing" || phase === "jump";
+      phase === "ready" || phase === "positioning" || phase === "standing" ||
+      phase === "jump" || phase === "hold";
     if (isCameraPhase && videoRef.current && streamRef.current) {
       videoRef.current.srcObject = streamRef.current;
     }
   }, [phase]);
 
+  // ---- Beep helpers ----
+  function ensureAudioContext(): AudioContext | null {
+    const Ctor = getAudioContextConstructor();
+    if (!Ctor) return null;
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new Ctor();
+    }
+    if (audioCtxRef.current.state === "suspended") {
+      audioCtxRef.current.resume();
+    }
+    return audioCtxRef.current;
+  }
+
+  function playBeep(frequency: number, durationMs: number) {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + durationMs / 1000);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + durationMs / 1000 + 0.03);
+  }
+
   // ---- Open the camera and show the live preview ----
-  async function openCamera() {
+  async function openCamera(useFacing: FacingMode = facing) {
     setErrorMsg(null);
     try {
-      // facingMode "environment" = rear camera (points at the athlete when
-      // the phone is propped up). audio off — we only need video.
+      // "environment" = rear camera, "user" = front/selfie camera.
+      // audio off — we only need video.
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode: useFacing, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
       streamRef.current = stream;
@@ -141,6 +207,14 @@ export default function CapturePage() {
       );
       setPhase("error");
     }
+  }
+
+  // ---- Switch between front and back camera (iPhone/Android both support this) ----
+  async function flipCamera() {
+    const next: FacingMode = facing === "environment" ? "user" : "environment";
+    stopStream();
+    setFacing(next);
+    await openCamera(next);
   }
 
   // ---- Choose a recording format the browser supports ----
@@ -166,6 +240,7 @@ export default function CapturePage() {
   function startRecording() {
     if (!streamRef.current) return;
     setErrorMsg(null);
+    ensureAudioContext(); // unlock audio now, inside this user-gesture click
 
     // Phase 1: give the athlete time to walk into frame. Not recording yet.
     setPhase("positioning");
@@ -198,28 +273,45 @@ export default function CapturePage() {
 
     // Phase 2: standing baseline countdown (recorded).
     setPhase("standing");
-    runCountdown(STANDING_SECONDS, () => setPhase("jump"));
+    runCountdown(STANDING_SECONDS, () => beginJumpAndHold());
   }
 
-  // Simple countdown helper: counts `seconds` down to 0, then calls done().
+  // Phase 3+4, fully automatic: JUMP cue for ~ an average jump's duration,
+  // then a guided landing hold, then the recording stops itself.
+  function beginJumpAndHold() {
+    playBeep(1400, 250); // the "go" signal
+    setPhase("jump");
+    timersRef.current.push(
+      setTimeout(() => {
+        playBeep(660, 150); // "you should be landing about now, hold still"
+        setPhase("hold");
+        timersRef.current.push(
+          setTimeout(() => {
+            playBeep(1046, 200); // done
+            recorderRef.current?.stop(); // triggers onstop -> review
+          }, HOLD_SECONDS * 1000)
+        );
+      }, JUMP_SECONDS * 1000)
+    );
+  }
+
+  // Simple countdown helper: counts `seconds` down to 0, beeping each
+  // second, then calls done().
   function runCountdown(seconds: number, done: () => void) {
     setCountdown(seconds);
+    playBeep(880, 100);
     let remaining = seconds;
     const tick = () => {
       remaining -= 1;
       setCountdown(remaining);
       if (remaining > 0) {
+        playBeep(880, 100);
         timersRef.current.push(setTimeout(tick, 1000));
       } else {
         done();
       }
     };
     timersRef.current.push(setTimeout(tick, 1000));
-  }
-
-  // ---- User taps Stop after the jump/landing ----
-  function stopRecording() {
-    recorderRef.current?.stop(); // triggers onstop -> review
   }
 
   function retake() {
@@ -247,11 +339,17 @@ export default function CapturePage() {
     clipsRef.current = [undefined, undefined];
     setClipIndex(0);
     setErrorMsg(null);
+    setRequiredAnswers({});
     setPhase("setup");
   }
 
+  // ---- All clips are done; ask the one required questionnaire before submitting ----
+  function goToQuestionnaire(includeSecond: boolean) {
+    setPendingIncludeSecond(includeSecond);
+    setPhase("questionnaire");
+  }
+
   // ---- Upload the recorded clip(s) and run analysis ----
-  // includeSecond=false analyzes just clip 0, even if a clip 1 was recorded.
   async function finish(includeSecond: boolean) {
     const primaryClip = clipsRef.current[0];
     if (!primaryClip) return;
@@ -292,8 +390,9 @@ export default function CapturePage() {
         primaryUpload.uploadId,
         athleteName,
         view,
-        hasAnyAnswer(questionnaire) ? questionnaire : undefined,
-        sideUploadId
+        requiredAnswers,
+        sideUploadId,
+        requiredAnswers
       );
 
       stopStream();
@@ -309,9 +408,10 @@ export default function CapturePage() {
   const processingStage: ProcessingStage =
     phase === "uploading" ? "uploading" : phase === "processing" ? "processing" : "idle";
 
-  const recording = phase === "standing" || phase === "jump";
+  const recording = phase === "standing" || phase === "jump" || phase === "hold";
   const cameraPhase =
-    phase === "ready" || phase === "positioning" || phase === "standing" || phase === "jump";
+    phase === "ready" || phase === "positioning" || phase === "standing" ||
+    phase === "jump" || phase === "hold";
 
   return (
     <section className="mx-auto max-w-2xl px-6 py-12">
@@ -331,10 +431,11 @@ export default function CapturePage() {
           <ul className="mt-3 space-y-2 text-sm text-muted">
             <li className="flex gap-2"><span className="text-track">1.</span> Prop your phone on something stable, about chest height.</li>
             <li className="flex gap-2"><span className="text-track">2.</span> Stand back 3–4 m (10–13 ft) so the whole body fits in frame.</li>
-            <li className="flex gap-2"><span className="text-track">3.</span> Center the camera squarely on the athlete — not off to one side.</li>
+            <li className="flex gap-2"><span className="text-track">3.</span> Center the camera squarely on the athlete, not off to one side.</li>
             <li className="flex gap-2"><span className="text-track">4.</span> Good, even lighting. Fitted clothing works best.</li>
-            <li className="flex gap-2"><span className="text-track">5.</span> After you tap record, you&apos;ll get {POSITION_SECONDS}s to step into frame, then a {STANDING_SECONDS}s &quot;stand still&quot;, then a JUMP cue.</li>
+            <li className="flex gap-2"><span className="text-track">5.</span> After you tap record: {POSITION_SECONDS}s to get in position, a {STANDING_SECONDS}s &quot;stand still&quot;, a JUMP cue, then a moment to hold your landing. All automatic, with beeps to guide you, no need to tap stop.</li>
             <li className="flex gap-2"><span className="text-track">6.</span> Afterward you&apos;ll be guided to turn and record the opposite angle too (optional, but it roughly doubles what the screening score can see).</li>
+            <li className="flex gap-2"><span className="text-track">7.</span> A few required questions come right after recording, once you&apos;ve seen your landing.</li>
           </ul>
 
           <label className="mt-6 block text-sm font-medium text-ink">
@@ -374,29 +475,8 @@ export default function CapturePage() {
             </div>
           </fieldset>
 
-          {/* Optional screening questionnaire — adds self-reported risk
-              factors to the biomechanical score shown on the report page. */}
-          <div className="mt-5 border-t border-line pt-5">
-            <button
-              type="button"
-              onClick={() => setShowQuestionnaire((v) => !v)}
-              className="flex w-full items-center justify-between text-left"
-            >
-              <span className="text-sm font-medium text-ink">
-                Screening questionnaire (optional)
-              </span>
-              <span className="text-xs text-track">{showQuestionnaire ? "Hide" : "Add"}</span>
-            </button>
-            {showQuestionnaire && (
-              <div className="mt-4">
-                <QuestionnaireForm value={questionnaire} onChange={setQuestionnaire} />
-              </div>
-            )}
-          </div>
-
-          <div className="mt-6 flex gap-3">
-            <Button onClick={openCamera} variant="primary" className="flex-1">Open camera</Button>
-            <Button href="/analyze" variant="outline">Upload instead</Button>
+          <div className="mt-6">
+            <Button onClick={() => openCamera()} variant="primary" className="w-full">Open camera</Button>
           </div>
         </div>
       )}
@@ -423,6 +503,23 @@ export default function CapturePage() {
               </div>
             )}
 
+            {/* Flip camera — only while not recording. */}
+            {phase === "ready" && (
+              <button
+                type="button"
+                onClick={flipCamera}
+                aria-label="Flip camera"
+                className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M17 2l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M3 12v-2a4 4 0 0 1 4-4h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M7 22l-4-4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M21 12v2a4 4 0 0 1-4 4H3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+
             {/* Big guided overlays */}
             {phase === "positioning" && (
               <Overlay label="Get in position" big={String(countdown)} />
@@ -433,18 +530,26 @@ export default function CapturePage() {
             {phase === "jump" && (
               <Overlay label="" big="JUMP!" tone="risk" />
             )}
+            {phase === "hold" && (
+              <Overlay label="Stay still for the landing" big="HOLD" />
+            )}
           </div>
 
           {/* Controls */}
-          <div className="mt-4 flex justify-center">
+          <div className="mt-4 flex flex-col items-center gap-2">
             {phase === "ready" && (
-              <Button onClick={startRecording} variant="primary">Start recording</Button>
+              <>
+                <Button onClick={startRecording} variant="primary">Start recording</Button>
+                {facing === "user" && (
+                  <p className="text-center text-xs text-muted">
+                    Front camera can mirror left/right in the video, so use the back
+                    camera when you can for the most accurate results.
+                  </p>
+                )}
+              </>
             )}
-            {phase === "jump" && (
-              <Button onClick={stopRecording} variant="primary">Stop recording</Button>
-            )}
-            {(phase === "positioning" || phase === "standing") && (
-              <p className="text-sm text-muted">Recording will guide you… get ready.</p>
+            {(phase === "positioning" || phase === "standing" || phase === "jump" || phase === "hold") && (
+              <p className="text-sm text-muted">Recording will guide you automatically…</p>
             )}
           </div>
         </div>
@@ -461,7 +566,7 @@ export default function CapturePage() {
             Check that your whole body is in frame for the whole jump, and that the
             landing is captured. {clipsRef.current[clipIndex]?.ext === "webm" && (
               <span>
-                (Recorded as .webm — this works, but phones record .mp4 which
+                (Recorded as .webm, which works, but phones record .mp4, which
                 analyzes most reliably.)
               </span>
             )}
@@ -471,21 +576,21 @@ export default function CapturePage() {
             <div className="mt-5 space-y-3">
               <div className="flex gap-3">
                 <Button onClick={goToTransition} variant="primary" className="flex-1">
-                  Continue — add {viewLabel(otherView)} angle
+                  Continue, add {viewLabel(otherView)} angle
                 </Button>
                 <Button onClick={retake} variant="outline">Retake</Button>
               </div>
               <button
                 type="button"
-                onClick={() => finish(false)}
+                onClick={() => goToQuestionnaire(false)}
                 className="w-full text-center text-xs text-muted hover:text-track hover:underline"
               >
-                Skip — analyze with just this clip
+                Skip, analyze with just this clip
               </button>
             </div>
           ) : (
             <div className="mt-5 flex gap-3">
-              <Button onClick={() => finish(true)} variant="primary" className="flex-1">
+              <Button onClick={() => goToQuestionnaire(true)} variant="primary" className="flex-1">
                 Use both clips
               </Button>
               <Button onClick={retake} variant="outline">Retake</Button>
@@ -502,7 +607,7 @@ export default function CapturePage() {
             Now let&apos;s get the {viewLabel(otherView)} angle
           </h2>
           <p className="mt-3 text-sm text-muted">
-            Keep the camera exactly where it is — just the athlete moves.{" "}
+            Keep the camera exactly where it is, just the athlete moves.{" "}
             {otherView === "front"
               ? "Turn to face the camera directly."
               : "Turn 90° so your side faces the camera."}{" "}
@@ -510,16 +615,44 @@ export default function CapturePage() {
           </p>
           <div className="mt-6 flex justify-center gap-3">
             <Button onClick={beginSecondClip} variant="primary">
-              I&apos;m turned — start recording
+              I&apos;m turned, start recording
             </Button>
           </div>
           <button
             type="button"
-            onClick={() => finish(false)}
+            onClick={() => goToQuestionnaire(false)}
             className="mt-4 text-xs text-muted hover:text-track hover:underline"
           >
-            Skip — analyze with just the {viewLabel(view)} clip
+            Skip, analyze with just the {viewLabel(view)} clip
           </button>
+        </div>
+      )}
+
+      {/* ---------- QUESTIONNAIRE (required, asked once you've seen the landing) ---------- */}
+      {phase === "questionnaire" && (
+        <div className="rounded-2xl border border-line bg-white p-6">
+          <h2 className="font-display font-semibold text-ink">A few required questions</h2>
+          <p className="mt-2 text-sm text-muted">
+            Last step. These add real, cited context to the score alongside your video.
+          </p>
+          <div className="mt-5">
+            <RequiredQuestionnaire value={requiredAnswers} onChange={setRequiredAnswers} />
+          </div>
+          <div className="mt-6">
+            <Button
+              onClick={() => finish(pendingIncludeSecond)}
+              variant="primary"
+              className="w-full"
+              disabled={!isQuestionnaireComplete(requiredAnswers)}
+            >
+              Submit and analyze
+            </Button>
+            {!isQuestionnaireComplete(requiredAnswers) && (
+              <p className="mt-2 text-center text-xs text-muted">
+                Answer every question above to continue.
+              </p>
+            )}
+          </div>
         </div>
       )}
 

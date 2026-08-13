@@ -19,13 +19,29 @@
 # in 2D video. A force plate measures impact directly; we estimate it.
 # Clips with double-bounces, occlusion, or heavy camera motion can fool
 # it. See the Part 5 limitations writeup.
+#
+# TWO DIFFERENT MOMENTS, NOT ONE (added for LESS support):
+# The hip-trough frame found above is the bottom of the landing squat —
+# in Landing Error Scoring System (LESS) terms, that's closest to MAXIMUM
+# FLEXION, not INITIAL CONTACT. Initial contact is EARLIER: the instant
+# the foot first touches the ground, while the hip is still actively
+# descending into the squat that follows. detect_initial_contact() below
+# finds that earlier moment by applying the same trough logic to the
+# ANKLES instead of the hips — the feet stop descending (touch down)
+# before the hips finish flexing into the landing. See:
+#   Padua DA, Marshall SW, Boling MC, Thigpen CA, Garrett WE Jr,
+#   Beutler AI. The Landing Error Scoring System (LESS) Is a Valid and
+#   Reliable Clinical Assessment Tool of Jump-Landing Biomechanics: The
+#   JUMP-ACL Study. Am J Sports Med. 2009;37(10):1996-2002.
 # ============================================================
 
 from dataclasses import dataclass
 
-# MediaPipe landmark indices for the hips.
+# MediaPipe landmark indices for the hips and ankles.
 LEFT_HIP = 23
 RIGHT_HIP = 24
+LEFT_ANKLE = 27
+RIGHT_ANKLE = 28
 
 # A frame's landmarks: list of (x, y, z, visibility) tuples, or None
 # if no pose was detected in that frame.
@@ -130,7 +146,7 @@ def detect_landing(per_frame: list[Landmarks], smooth_window: int = 5) -> Landin
             confident=False,
             note=(
                 f"Pose detected in only {detected_count}/{n} frames. "
-                "Landing frame is a fallback guess — re-film with the whole "
+                "Landing frame is a fallback guess. Re-film with the whole "
                 "body in frame and good lighting."
             ),
         )
@@ -161,7 +177,7 @@ def detect_landing(per_frame: list[Landmarks], smooth_window: int = 5) -> Landin
                 trajectory=traj,
                 confident=False,
                 note=(
-                    "The highest point is the last frame — the clip may end "
+                    "The highest point is the last frame, so the clip may end "
                     "before the landing. Re-film including the full landing."
                 ),
             )
@@ -191,7 +207,7 @@ def detect_landing(per_frame: list[Landmarks], smooth_window: int = 5) -> Landin
     )
     if not confident:
         note += (
-            " Vertical movement was very small — confirm this clip contains "
+            " Vertical movement was very small, so confirm this clip contains "
             "an actual jump landing."
         )
 
@@ -262,3 +278,131 @@ def find_standing_window(
         # end index in speeds maps to frame best_end (inclusive of that frame).
         return (best_start, min(best_end, airborne_peak_frame - 1))
     return None
+
+
+# ============================================================
+# INITIAL CONTACT (for LESS) — a second, earlier landmark event than the
+# max-flexion frame found above. See the module docstring.
+# ============================================================
+
+@dataclass
+class InitialContactResult:
+    """What detect_initial_contact found."""
+    frame: int             # index of the initial-contact frame
+    confident: bool        # False if the two moments couldn't be separated
+    note: str
+
+
+def ankle_trajectory(per_frame: list[Landmarks]) -> list[float | None]:
+    """
+    Average ankle y per frame. The ankles stop descending (touch down)
+    BEFORE the hips finish descending into the landing squat, so this
+    trajectory's trough comes earlier than the hip trajectory's — that
+    gap is exactly the difference between "initial contact" and "maximum
+    flexion" in LESS terms.
+    """
+    traj: list[float | None] = []
+    for landmarks in per_frame:
+        if landmarks is None:
+            traj.append(None)
+            continue
+        left_y = landmarks[LEFT_ANKLE][1]
+        right_y = landmarks[RIGHT_ANKLE][1]
+        traj.append((left_y + right_y) / 2.0)
+    return traj
+
+
+def _first_trough_frame(traj: list[float], start: int, end: int) -> int | None:
+    """
+    Walk forward from `start`, return the first index i (start <= i < end)
+    where the trajectory stops increasing (velocity traj[i+1]-traj[i] <= 0).
+    Shared logic behind both detect_landing's hip trough and the ankle-
+    based initial-contact search below.
+    """
+    for i in range(start, end):
+        if traj[i + 1] - traj[i] <= 0:
+            return i
+    return None
+
+
+def detect_initial_contact(
+    per_frame: list[Landmarks],
+    airborne_peak_frame: int,
+    max_flexion_frame: int,
+    smooth_window: int = 3,
+) -> InitialContactResult:
+    """
+    Find INITIAL CONTACT: the first moment the feet touch the ground after
+    the airborne phase. Searched only between the jump peak and the
+    already-detected max-flexion frame, so initial contact can never land
+    after max flexion — it's always at or before it, matching real landing
+    mechanics (the foot plants, THEN the knee/hip/trunk keep flexing to
+    absorb the impact).
+    """
+    if max_flexion_frame <= airborne_peak_frame + 1:
+        return InitialContactResult(
+            frame=max_flexion_frame,
+            confident=False,
+            note=(
+                "No room between the jump peak and the max-flexion frame to "
+                "separately locate initial contact; using the same frame for both."
+            ),
+        )
+
+    raw = ankle_trajectory(per_frame)
+    filled = _fill_gaps(raw)
+    traj = smooth(filled, smooth_window)
+
+    search_end = min(max_flexion_frame, len(traj) - 1)
+    contact = _first_trough_frame(traj, airborne_peak_frame + 1, search_end)
+
+    if contact is not None:
+        return InitialContactResult(
+            frame=contact,
+            confident=True,
+            note=(
+                f"Initial contact detected at frame {contact} (ankles stop "
+                f"descending here); maximum flexion follows at frame "
+                f"{max_flexion_frame}."
+            ),
+        )
+
+    return InitialContactResult(
+        frame=max_flexion_frame,
+        confident=False,
+        note=(
+            "Could not separate initial contact from maximum flexion in "
+            "this clip (the ankles never stopped descending before the "
+            "hip trough); using the same frame for both."
+        ),
+    )
+
+
+def detect_per_leg_contact(
+    per_frame: list[Landmarks],
+    airborne_peak_frame: int,
+    max_flexion_frame: int,
+    smooth_window: int = 3,
+) -> dict[str, int | None]:
+    """
+    Find EACH leg's own initial-contact frame independently (left ankle
+    vs right ankle), for LESS item 8 ("initial foot contact: symmetrical").
+    Returns {"left": frame|None, "right": frame|None} — None if that
+    ankle's trajectory never resolves to a clear touchdown in the search
+    window.
+    """
+    if max_flexion_frame <= airborne_peak_frame + 1:
+        return {"left": None, "right": None}
+
+    search_end = min(max_flexion_frame, len(per_frame) - 1)
+    result: dict[str, int | None] = {}
+
+    for side, index in (("left", LEFT_ANKLE), ("right", RIGHT_ANKLE)):
+        raw: list[float | None] = [
+            (lm[index][1] if lm is not None else None) for lm in per_frame
+        ]
+        filled = _fill_gaps(raw)
+        traj = smooth(filled, smooth_window)
+        result[side] = _first_trough_frame(traj, airborne_peak_frame + 1, search_end)
+
+    return result

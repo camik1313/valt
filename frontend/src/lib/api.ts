@@ -10,7 +10,7 @@
 // without changing code.
 // ============================================================
 
-import { Analysis, CameraView, QuestionnaireAnswers } from "./types";
+import { Analysis, CameraView, LessQuestionnaireAnswers, QuestionnaireAnswers } from "./types";
 
 // Read the backend URL from the environment, with a sensible fallback.
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -65,13 +65,17 @@ export async function uploadVideo(file: File): Promise<UploadResult> {
 // `sideUploadId` is an optional SECOND clip from the same session, filmed
 // from the opposite angle (front primary -> side second, or vice versa).
 // When given, its measurements are merged with the primary clip's, so the
-// screening score can see both frontal- and sagittal-plane criteria.
+// screening score AND the LESS score can see both frontal- and sagittal-
+// plane criteria instead of just one.
+// `lessQuestionnaire` answers the 3 LESS items no camera can score (foot
+// rotation x2, overall impression) — also optional.
 export async function analyzeVideo(
   uploadId: string,
   athleteName: string,
   view: CameraView,
   questionnaire?: QuestionnaireAnswers,
-  sideUploadId?: string
+  sideUploadId?: string,
+  lessQuestionnaire?: LessQuestionnaireAnswers
 ): Promise<Analysis> {
   const res = await fetch(`${API_URL}/analyze`, {
     method: "POST",
@@ -82,6 +86,7 @@ export async function analyzeVideo(
       view,
       questionnaire,
       sideUploadId,
+      lessQuestionnaire,
     }),
   });
   return handle<Analysis>(res);

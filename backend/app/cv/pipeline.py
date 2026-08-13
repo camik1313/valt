@@ -27,12 +27,19 @@
 from dataclasses import dataclass, field
 
 from app.cv import metrics, pose_estimator
-from app.cv.landing_detector import detect_landing, find_standing_window
+from app.cv.landing_detector import (
+    detect_landing,
+    detect_initial_contact,
+    detect_per_leg_contact,
+    find_standing_window,
+)
 
 L_SHOULDER, R_SHOULDER = 11, 12
 L_HIP, R_HIP = 23, 24
 L_KNEE, R_KNEE = 25, 26
 L_ANKLE, R_ANKLE = 27, 28
+L_HEEL, R_HEEL = 29, 30
+L_FOOT_INDEX, R_FOOT_INDEX = 31, 32
 
 # MediaPipe reports 0..1 confidence that a joint is really visible.
 # Below this we don't trust it (occluded, out of frame, motion blur).
@@ -72,6 +79,14 @@ class PipelineResult:
     landmark_count: int = 33
     notes: list[str] = field(default_factory=list)
     confident: bool = True
+    # Raw values feeding the LESS (Landing Error Scoring System) items valid
+    # for this view — see LESS_RAW_KEYS below and app/risk/less.py, which
+    # turns these into the actual 17-item LESS score. Kept separate from
+    # `measurements` (the existing report cards) so neither changes the
+    # other's meaning; `measurements` still reports at the max-flexion
+    # frame exactly as before this was added.
+    less_raw: dict[str, float] = field(default_factory=dict)
+    initial_contact_frame: int | None = None
 
 
 def _point(landmarks, index: int) -> tuple[float, float]:
@@ -136,7 +151,7 @@ def run_pipeline(seed: str, video_path: str, view: str = VIEW_FRONT) -> Pipeline
             "Re-filming with the full body in frame and fitted clothing helps."
         )
 
-    # ---- 2) The landing frame ----
+    # ---- 2) The landing frame (max flexion — the bottom of the squat) ----
     landing = detect_landing(extraction.per_frame)
     notes.append(landing.note)
 
@@ -148,8 +163,20 @@ def run_pipeline(seed: str, video_path: str, view: str = VIEW_FRONT) -> Pipeline
         landmarks = extraction.per_frame[nearest]
         notes.append(f"No pose on the landing frame; used nearest valid frame {nearest}.")
 
+    # ---- 2b) Initial contact — an EARLIER frame than the one above, for
+    # LESS. See the landing_detector module docstring: the feet touch down
+    # before the hips finish descending, so this is a distinct, earlier event.
+    initial_contact = detect_initial_contact(
+        extraction.per_frame, landing.airborne_peak_frame, landing.landing_frame
+    )
+    ic_landmarks = extraction.per_frame[initial_contact.frame]
+    if ic_landmarks is None:
+        nearest = _nearest_valid_frame(extraction.per_frame, initial_contact.frame)
+        ic_landmarks = extraction.per_frame[nearest] if nearest is not None else None
+
     # ---- 3) Measure — ONLY what this view can actually see ----
     measurements: dict[str, float] = {}
+    less_raw: dict[str, float] = {}
     left_leg_ok = _visible(landmarks, L_HIP, L_KNEE, L_ANKLE)
     right_leg_ok = _visible(landmarks, R_HIP, R_KNEE, R_ANKLE)
 
@@ -227,8 +254,8 @@ def run_pipeline(seed: str, video_path: str, view: str = VIEW_FRONT) -> Pipeline
             )
         else:
             notes.append(
-                "No standing baseline in this clip, so valgus is UNCORRECTED — "
-                "camera perspective may inflate it. Film a few seconds of standing "
+                "No standing baseline in this clip, so valgus is UNCORRECTED. "
+                "Camera perspective may inflate it. Film a few seconds of standing "
                 "before the jump (the guided capture does this automatically). "
                 "Left/right asymmetry is still reliable without a baseline."
             )
@@ -268,10 +295,57 @@ def run_pipeline(seed: str, video_path: str, view: str = VIEW_FRONT) -> Pipeline
                 metrics.lateral_trunk_lean(shoulder_mid, hip_mid), 1
             )
 
+        # ---- LESS (frontal-view items 8, 9, 10, 11, 12, 15) ----
+        # Raw, uncorrected values (no standing-baseline adjustment — LESS
+        # has no such concept; see app/risk/less.py for how these become
+        # the actual 17-item score). Uses initial contact (ic_landmarks),
+        # not the max-flexion frame used above, for the "at initial
+        # contact" items — and the DIFFERENCE between the two frames for
+        # "displacement" items, matching the official LESS protocol.
+        if ic_landmarks is not None:
+            ic_valgus = valgus_at(ic_landmarks)
+            if "left" in ic_valgus:
+                less_raw["less_knee_valgus_ic_left"] = round(ic_valgus["left"], 3)
+                if "left" in landing_valgus:
+                    less_raw["less_knee_valgus_displacement_left"] = round(
+                        landing_valgus["left"] - ic_valgus["left"], 3
+                    )
+            if "right" in ic_valgus:
+                less_raw["less_knee_valgus_ic_right"] = round(ic_valgus["right"], 3)
+                if "right" in landing_valgus:
+                    less_raw["less_knee_valgus_displacement_right"] = round(
+                        landing_valgus["right"] - ic_valgus["right"], 3
+                    )
+
+            if _visible(ic_landmarks, L_SHOULDER, R_SHOULDER, L_HIP, R_HIP):
+                ic_shoulder_mid = _midpoint(
+                    _point(ic_landmarks, L_SHOULDER), _point(ic_landmarks, R_SHOULDER)
+                )
+                ic_hip_mid = _midpoint(_point(ic_landmarks, L_HIP), _point(ic_landmarks, R_HIP))
+                less_raw["less_trunk_lateral_ic"] = round(
+                    metrics.lateral_trunk_lean(ic_shoulder_mid, ic_hip_mid), 1
+                )
+
+            if _visible(ic_landmarks, L_ANKLE, R_ANKLE, L_SHOULDER, R_SHOULDER):
+                less_raw["less_stance_width_ratio_ic"] = round(
+                    metrics.stance_width_ratio(
+                        _point(ic_landmarks, L_ANKLE), _point(ic_landmarks, R_ANKLE),
+                        _point(ic_landmarks, L_SHOULDER), _point(ic_landmarks, R_SHOULDER),
+                    ), 3,
+                )
+
+        per_leg_contact = detect_per_leg_contact(
+            extraction.per_frame, landing.airborne_peak_frame, landing.landing_frame
+        )
+        if per_leg_contact["left"] is not None and per_leg_contact["right"] is not None:
+            less_raw["less_foot_contact_asymmetry_frames"] = float(
+                abs(per_leg_contact["left"] - per_leg_contact["right"])
+            )
+
         notes.append(
             "Front view: measuring the FRONTAL plane (knee valgus, lateral lean). "
             "Knee/hip flexion are sagittal-plane motions and cannot be measured "
-            "from this angle — film from the side for those."
+            "from this angle. Film from the side for those."
         )
 
     else:  # VIEW_SIDE
@@ -314,15 +388,92 @@ def run_pipeline(seed: str, video_path: str, view: str = VIEW_FRONT) -> Pipeline
                 metrics.trunk_lean(shoulder_mid, hip_mid), 1
             )
 
+        # ---- LESS (sagittal-view items 1-7) ----
+        # Same "at initial contact" vs "displacement" split as the front
+        # branch above, using ic_landmarks vs the max-flexion landmarks
+        # already used for `measurements`.
+        if ic_landmarks is not None:
+            ic_left_leg_ok = _visible(ic_landmarks, L_HIP, L_KNEE, L_ANKLE)
+            ic_right_leg_ok = _visible(ic_landmarks, R_HIP, R_KNEE, R_ANKLE)
+
+            if ic_left_leg_ok:
+                ic_knee_flexion_left = metrics.knee_flexion(
+                    _point(ic_landmarks, L_HIP), _point(ic_landmarks, L_KNEE), _point(ic_landmarks, L_ANKLE)
+                )
+                less_raw["less_knee_flexion_ic_left"] = round(ic_knee_flexion_left, 1)
+                if "knee_flexion_left" in measurements:
+                    less_raw["less_knee_flexion_displacement_left"] = round(
+                        measurements["knee_flexion_left"] - ic_knee_flexion_left, 1
+                    )
+            if ic_right_leg_ok:
+                ic_knee_flexion_right = metrics.knee_flexion(
+                    _point(ic_landmarks, R_HIP), _point(ic_landmarks, R_KNEE), _point(ic_landmarks, R_ANKLE)
+                )
+                less_raw["less_knee_flexion_ic_right"] = round(ic_knee_flexion_right, 1)
+                if "knee_flexion_right" in measurements:
+                    less_raw["less_knee_flexion_displacement_right"] = round(
+                        measurements["knee_flexion_right"] - ic_knee_flexion_right, 1
+                    )
+
+            if _visible(ic_landmarks, L_SHOULDER, L_HIP, L_KNEE):
+                ic_hip_flexion_left = metrics.hip_flexion(
+                    _point(ic_landmarks, L_SHOULDER), _point(ic_landmarks, L_HIP), _point(ic_landmarks, L_KNEE)
+                )
+                less_raw["less_hip_flexion_ic_left"] = round(ic_hip_flexion_left, 1)
+                if "hip_flexion_left" in measurements:
+                    less_raw["less_hip_flexion_displacement_left"] = round(
+                        measurements["hip_flexion_left"] - ic_hip_flexion_left, 1
+                    )
+            if _visible(ic_landmarks, R_SHOULDER, R_HIP, R_KNEE):
+                ic_hip_flexion_right = metrics.hip_flexion(
+                    _point(ic_landmarks, R_SHOULDER), _point(ic_landmarks, R_HIP), _point(ic_landmarks, R_KNEE)
+                )
+                less_raw["less_hip_flexion_ic_right"] = round(ic_hip_flexion_right, 1)
+                if "hip_flexion_right" in measurements:
+                    less_raw["less_hip_flexion_displacement_right"] = round(
+                        measurements["hip_flexion_right"] - ic_hip_flexion_right, 1
+                    )
+
+            if _visible(ic_landmarks, L_SHOULDER, R_SHOULDER, L_HIP, R_HIP):
+                ic_shoulder_mid = _midpoint(
+                    _point(ic_landmarks, L_SHOULDER), _point(ic_landmarks, R_SHOULDER)
+                )
+                ic_hip_mid = _midpoint(_point(ic_landmarks, L_HIP), _point(ic_landmarks, R_HIP))
+                ic_trunk_lean = metrics.trunk_lean(ic_shoulder_mid, ic_hip_mid)
+                less_raw["less_trunk_flexion_ic"] = round(ic_trunk_lean, 1)
+                if "trunk_lean_forward" in measurements:
+                    less_raw["less_trunk_flexion_displacement"] = round(
+                        measurements["trunk_lean_forward"] - ic_trunk_lean, 1
+                    )
+
+            # Ankle plantarflexion pattern ("toe to heel"). Near-side leg
+            # is far more reliable from a side view (the far foot is
+            # usually partly occluded) — and foot landmarks in general
+            # track less reliably than the major joints above.
+            if ic_left_leg_ok and _visible(ic_landmarks, L_HEEL, L_FOOT_INDEX):
+                less_raw["less_toe_to_heel_offset_left"] = round(
+                    metrics.toe_to_heel_offset(
+                        _point(ic_landmarks, L_HEEL), _point(ic_landmarks, L_FOOT_INDEX)
+                    ), 4,
+                )
+            if ic_right_leg_ok and _visible(ic_landmarks, R_HEEL, R_FOOT_INDEX):
+                less_raw["less_toe_to_heel_offset_right"] = round(
+                    metrics.toe_to_heel_offset(
+                        _point(ic_landmarks, R_HEEL), _point(ic_landmarks, R_FOOT_INDEX)
+                    ), 4,
+                )
+
         notes.append(
             "Side view: measuring the SAGITTAL plane (knee/hip flexion, forward lean). "
             "Knee valgus is a frontal-plane motion and cannot be measured from this "
-            "angle — film from the front for that."
+            "angle. Film from the front for that."
         )
         notes.append(
             "From the side, the near leg blocks the far leg, so the far leg's values "
             "are less reliable. Treat the near-side leg as the measured one."
         )
+
+    notes.append(initial_contact.note)
 
     return PipelineResult(
         landing_frame=landing.landing_frame,
@@ -331,4 +482,6 @@ def run_pipeline(seed: str, video_path: str, view: str = VIEW_FRONT) -> Pipeline
         landmark_count=33,
         notes=notes,
         confident=landing.confident and extraction.detection_rate >= 0.7,
+        less_raw=less_raw,
+        initial_contact_frame=initial_contact.frame,
     )

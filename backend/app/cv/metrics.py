@@ -230,3 +230,52 @@ def lateral_trunk_lean(shoulder_mid: Point, hip_mid: Point) -> float:
     unlike the leg angles, this one survives a front view.
     """
     return trunk_lean(shoulder_mid, hip_mid)
+
+
+# ============================================================
+# LESS-SPECIFIC GEOMETRY (front view)
+#
+# The Landing Error Scoring System (LESS) scores stance width against
+# SHOULDER width specifically (not hip width, which knee_valgus_index
+# uses) — see the official LESS scoring sheet, items 11-12.
+#   Padua DA, Marshall SW, Boling MC, Thigpen CA, Garrett WE Jr,
+#   Beutler AI. The Landing Error Scoring System (LESS) Is a Valid and
+#   Reliable Clinical Assessment Tool of Jump-Landing Biomechanics: The
+#   JUMP-ACL Study. Am J Sports Med. 2009;37(10):1996-2002.
+# ============================================================
+
+def stance_width_ratio(
+    left_ankle: Point, right_ankle: Point, left_shoulder: Point, right_shoulder: Point
+) -> float:
+    """
+    Foot stance width relative to shoulder width, horizontally.
+
+        < 1 = feet narrower than shoulders (LESS item 11: "stance width narrow")
+        ~ 1 = feet about shoulder-width apart
+        > 1 = feet wider than shoulders (LESS item 12: "stance width wide")
+
+    A ratio, so body size and camera distance mostly cancel (same idea as
+    knee_ankle_separation_ratio).
+    """
+    shoulder_sep = abs(left_shoulder[0] - right_shoulder[0])
+    ankle_sep = abs(left_ankle[0] - right_ankle[0])
+    if shoulder_sep <= 1e-9:
+        return 1.0
+    return ankle_sep / shoulder_sep
+
+
+def toe_to_heel_offset(heel: Point, toe: Point) -> float:
+    """
+    Vertical offset between the toe (MediaPipe's foot-index landmark) and
+    heel at a single frame, in normalized image units (y grows DOWNWARD,
+    so a larger y is lower/closer to the ground).
+
+        positive = toe lower than heel -> forefoot touches first, the
+                   "toe to heel" pattern LESS item 7 counts as no error
+        ~0 or negative = flat-footed or heel-first contact -> the error case
+
+    LOWER CONFIDENCE than joint-based measurements: MediaPipe's foot
+    landmarks (heel/foot-index) are smaller and tracked less reliably than
+    the major joints, especially in fast, motion-blurred phone footage.
+    """
+    return toe[1] - heel[1]

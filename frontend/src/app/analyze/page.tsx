@@ -1,8 +1,13 @@
 // ============================================================
-// analyze/page.tsx — the upload workflow, NOW WIRED TO THE BACKEND.
+// analyze/page.tsx — the file-upload fallback.
 //
-// The flow is the same as before, but startAnalysis() no longer
-// fakes it with timers. It calls the real API:
+// This is NOT the primary way to submit a video anymore — guided
+// capture (/capture) is. This page only exists as a recovery path for
+// when a browser genuinely can't access the camera; it's reachable from
+// capture's error screen ("Upload a file instead"), and isn't linked
+// from the navbar, homepage, or footer.
+//
+// The flow calls the real API:
 //   uploadVideo()  -> POST /upload
 //   analyzeVideo() -> POST /analyze
 // and then routes the user to the real report by id.
@@ -17,8 +22,11 @@ import Link from "next/link";
 import VideoUploader from "@/components/upload/VideoUploader";
 import ProcessingStatus from "@/components/upload/ProcessingStatus";
 import Button from "@/components/ui/Button";
-import QuestionnaireForm, { hasAnyAnswer } from "@/components/questionnaire/QuestionnaireForm";
-import { ProcessingStage, CameraView, QuestionnaireAnswers } from "@/lib/types";
+import RequiredQuestionnaire, {
+  RequiredAnswers,
+  isQuestionnaireComplete,
+} from "@/components/questionnaire/RequiredQuestionnaire";
+import { ProcessingStage, CameraView } from "@/lib/types";
 import { uploadVideo, analyzeVideo } from "@/lib/api";
 
 export default function AnalyzePage() {
@@ -29,8 +37,7 @@ export default function AnalyzePage() {
   // Which camera angle this clip was filmed from. This decides which
   // measurements are scientifically valid (frontal vs sagittal plane).
   const [view, setView] = useState<CameraView>("front");
-  const [showQuestionnaire, setShowQuestionnaire] = useState(false);
-  const [questionnaire, setQuestionnaire] = useState<QuestionnaireAnswers>({});
+  const [requiredAnswers, setRequiredAnswers] = useState<RequiredAnswers>({});
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -50,7 +57,7 @@ export default function AnalyzePage() {
 
   // ---- THE REAL PIPELINE (calls the backend) ----
   async function startAnalysis() {
-    if (!file) return;
+    if (!file || !isQuestionnaireComplete(requiredAnswers)) return;
     setErrorMsg(null);
 
     try {
@@ -75,7 +82,9 @@ export default function AnalyzePage() {
         upload.uploadId,
         athleteName,
         view,
-        hasAnyAnswer(questionnaire) ? questionnaire : undefined
+        requiredAnswers,
+        undefined,
+        requiredAnswers
       ); // POST /analyze
 
       // 3) COMPLETE. Remember the id so we can link to the real report.
@@ -98,8 +107,7 @@ export default function AnalyzePage() {
     setProgress(0);
     setAnalysisId(null);
     setErrorMsg(null);
-    setShowQuestionnaire(false);
-    setQuestionnaire({});
+    setRequiredAnswers({});
   }
 
   return (
@@ -115,9 +123,9 @@ export default function AnalyzePage() {
           Front-facing clip, athlete landing in frame. We&apos;ll measure the mechanics.
         </p>
         <p className="mt-2 text-sm text-muted">
-          No clip yet?{" "}
+          This is a fallback for when the camera doesn&apos;t work. Prefer the guided flow?{" "}
           <Link href="/capture" className="text-track hover:underline">
-            Record one now with guided capture →
+            Go to guided capture →
           </Link>
         </p>
       </div>
@@ -191,37 +199,34 @@ export default function AnalyzePage() {
                 </div>
               </fieldset>
 
-              {/* Optional screening questionnaire — adds self-reported risk
-                  factors to the biomechanical score. See RiskScoreCard on
-                  the report page for how this is used. */}
+              {/* Required questionnaire — adds real, cited risk-factor
+                  context (plus LESS's "overall impression" item) to the
+                  score. All required; see RequiredQuestionnaire.tsx. */}
               <div className="mt-5 border-t border-line pt-5">
-                <button
-                  type="button"
-                  onClick={() => setShowQuestionnaire((v) => !v)}
-                  className="flex w-full items-center justify-between text-left"
-                >
-                  <span className="text-sm font-medium text-ink">
-                    Screening questionnaire (optional)
-                  </span>
-                  <span className="text-xs text-track">
-                    {showQuestionnaire ? "Hide" : "Add"}
-                  </span>
-                </button>
-                {showQuestionnaire && (
-                  <div className="mt-4">
-                    <QuestionnaireForm value={questionnaire} onChange={setQuestionnaire} />
-                  </div>
-                )}
+                <h3 className="text-sm font-medium text-ink">Required questions</h3>
+                <div className="mt-4">
+                  <RequiredQuestionnaire value={requiredAnswers} onChange={setRequiredAnswers} />
+                </div>
               </div>
 
               <div className="mt-6 flex gap-3">
-                <Button onClick={startAnalysis} variant="primary" className="flex-1">
+                <Button
+                  onClick={startAnalysis}
+                  variant="primary"
+                  className="flex-1"
+                  disabled={!isQuestionnaireComplete(requiredAnswers)}
+                >
                   Start analysis
                 </Button>
                 <Button onClick={reset} variant="outline">
                   Choose another
                 </Button>
               </div>
+              {!isQuestionnaireComplete(requiredAnswers) && (
+                <p className="mt-2 text-center text-xs text-muted">
+                  Answer every required question above to continue.
+                </p>
+              )}
             </div>
           )}
         </>

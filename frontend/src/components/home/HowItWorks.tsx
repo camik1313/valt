@@ -9,7 +9,7 @@ const steps = [
   {
     n: "01",
     title: "Record & upload",
-    body: "Film a jump landing from the front on any smartphone. Upload the clip — no special equipment or sensors required.",
+    body: "Film a jump landing from the front on any smartphone. Upload the clip, no special equipment or sensors required.",
     gradient: "from-bloom to-iris",
   },
   {

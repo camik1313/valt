@@ -31,7 +31,7 @@ const mono = JetBrains_Mono({
 
 // Metadata shows up in the browser tab and in link previews / search results.
 export const metadata: Metadata = {
-  title: "VALT — Movement analysis for jump landings",
+  title: "VALT: Movement analysis for jump landings",
   description:
     "Measure biomechanical patterns associated with ACL injury risk from a smartphone video. Not a diagnostic tool.",
 };
