@@ -18,7 +18,7 @@
 
 import pytest
 
-from app.cv import pipeline, pose_estimator
+from app.cv import landing_detector, pipeline, pose_estimator
 
 L_SHOULDER, R_SHOULDER = 11, 12
 L_HIP, R_HIP = 23, 24
@@ -315,3 +315,45 @@ def test_front_view_less_raw_includes_stance_and_contact_symmetry(monkeypatch):
     assert "less_foot_contact_asymmetry_frames" in result.less_raw
     assert "less_trunk_lateral_ic" in result.less_raw
     assert "less_knee_valgus_ic_left" in result.less_raw
+
+
+# ============================================================
+# REBOUND LANDING — the real LESS protocol has the athlete jump immediately
+# into a second max-effort vertical jump right after landing (see
+# capture/page.tsx's "WHY REBOUND" note), rather than holding the landing
+# still. That makes the trough at the bottom of the landing squat brief —
+# a few frames wide — instead of the long held plateau every other fixture
+# in this file uses. This proves detect_landing's smoothing doesn't blur
+# away a short trough between a sharp descent and an equally sharp rise.
+# ============================================================
+
+def test_landing_frame_found_with_quick_rebound_not_held_landing():
+    standing_y = 0.50
+    peak_y = 0.30           # top of the first jump
+    trough_y = 0.65         # bottom of the landing squat
+    rebound_peak_y = 0.35   # top of the immediate second jump (stays above peak_y)
+
+    frames = []
+    for _ in range(10):  # standing
+        frames.append(_full_frame({
+            L_HIP: (0.5, standing_y, 0.0, 1.0), R_HIP: (0.5, standing_y, 0.0, 1.0),
+        }))
+    for i in range(10):  # airborne, up to the first jump's peak
+        t = (i + 1) / 10
+        y = standing_y + t * (peak_y - standing_y)
+        frames.append(_full_frame({L_HIP: (0.5, y, 0.0, 1.0), R_HIP: (0.5, y, 0.0, 1.0)}))
+    for _ in range(3):  # QUICK trough — the whole point of this test
+        frames.append(_full_frame({L_HIP: (0.5, trough_y, 0.0, 1.0), R_HIP: (0.5, trough_y, 0.0, 1.0)}))
+    for i in range(10):  # rebound: sharp rise back up into a second jump
+        t = (i + 1) / 10
+        y = trough_y + t * (rebound_peak_y - trough_y)
+        frames.append(_full_frame({L_HIP: (0.5, y, 0.0, 1.0), R_HIP: (0.5, y, 0.0, 1.0)}))
+
+    result = landing_detector.detect_landing(frames)
+
+    trough_start, trough_end = 20, 22  # frames 20-22: the 3-frame trough
+    assert trough_start - 1 <= result.landing_frame <= trough_end + 1, (
+        f"expected landing frame near the {trough_start}-{trough_end} trough, "
+        f"got {result.landing_frame}"
+    )
+    assert result.confident is True

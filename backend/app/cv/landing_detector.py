@@ -220,6 +220,49 @@ def detect_landing(per_frame: list[Landmarks], smooth_window: int = 5) -> Landin
     )
 
 
+def _longest_low_motion_run(
+    traj: list[float], region_start: int, region_end: int, min_len: int
+) -> tuple[int, int] | None:
+    """
+    Find the longest run of consecutive low-speed frames within
+    traj[region_start:region_end], using frame-to-frame speed thresholded
+    against the WHOLE trajectory's travel range (so the threshold scales
+    with the clip instead of being a magic number). Returns absolute frame
+    indices (start, end) inclusive, or None if nothing qualifies.
+
+    Shared by find_standing_window (searches the whole pre-jump region for
+    ANY stable stretch) and refine_window (searches a caller-specified hint
+    region for its most stable stretch) — same "low motion" definition,
+    different search scope.
+    """
+    region = traj[region_start:region_end]
+    if len(region) < min_len:
+        return None
+
+    speeds = [abs(region[i + 1] - region[i]) for i in range(len(region) - 1)]
+    if not speeds:
+        return None
+
+    jump_travel = max(traj) - min(traj)
+    threshold = max(0.002, jump_travel * 0.05)
+
+    best_start = best_end = None
+    best_len = 0
+    run_start = 0
+    for i in range(len(speeds) + 1):
+        moving = i == len(speeds) or speeds[i] > threshold
+        if moving:
+            run_len = i - run_start
+            if run_len > best_len:
+                best_len = run_len
+                best_start, best_end = run_start, i  # region-relative [run_start, i]
+            run_start = i + 1
+
+    if best_len >= min_len and best_start is not None:
+        return (region_start + best_start, region_start + min(best_end, len(region) - 1))
+    return None
+
+
 def find_standing_window(
     per_frame: list[Landmarks],
     airborne_peak_frame: int,
@@ -234,10 +277,9 @@ def find_standing_window(
     Returns (start_frame, end_frame) inclusive, or None if no stable
     standing period exists (e.g. a jump-only clip with no lead-in).
 
-    METHOD: look only at frames before the jump peak. Compute frame-to-frame
-    vertical speed of the hips. A "standing" stretch is a maximal run of
-    consecutive frames whose speed stays below a small threshold. We take
-    the longest such run if it is at least `min_len` frames.
+    METHOD: look only at frames before the jump peak, search for the
+    longest low-motion run anywhere in that region. See
+    _longest_low_motion_run.
     """
     if airborne_peak_frame < min_len:
         return None  # not enough lead-in before the jump
@@ -246,38 +288,47 @@ def find_standing_window(
     filled = _fill_gaps(raw)
     traj = smooth(filled, window=5)
 
-    # Only consider the pre-jump portion.
-    region = traj[:airborne_peak_frame]
-    if len(region) < min_len:
+    return _longest_low_motion_run(traj, 0, airborne_peak_frame, min_len)
+
+
+def refine_window(
+    per_frame: list[Landmarks],
+    hint_start_frame: int,
+    hint_end_frame: int,
+    min_len: int = 5,
+) -> tuple[int, int] | None:
+    """
+    Refine a caller-provided HINT window (e.g. a known guided-capture
+    phase's frame range) down to its most stable low-motion sub-run.
+
+    Unlike find_standing_window, which searches an entire arbitrary
+    pre-jump lead-in because it has no idea where in that region standing
+    actually happens, this trusts the caller to already know roughly WHEN
+    a stance happens (guided capture has deterministic phase timing) and
+    only needs to tighten that estimate against brief settling time at the
+    start of the phase. See cv/calibration.py, which calls this twice (once
+    per hinted ground/box window) rather than trying to auto-classify two
+    detected stances.
+
+    Uses the ANKLE trajectory, not hip: ankle height is a more direct proxy
+    for foot elevation (what calibration needs) than hip height, which
+    shifts with knee bend and posture independent of true foot elevation.
+
+    min_len defaults lower than find_standing_window's: hint windows are
+    already short guided-capture phases (a few seconds), not a search over
+    an entire clip's lead-in.
+    """
+    n = len(per_frame)
+    start = max(0, hint_start_frame)
+    end = min(n, hint_end_frame)
+    if end - start < min_len:
         return None
 
-    # Frame-to-frame vertical speed.
-    speeds = [abs(region[i + 1] - region[i]) for i in range(len(region) - 1)]
-    if not speeds:
-        return None
+    raw = ankle_trajectory(per_frame)
+    filled = _fill_gaps(raw)
+    traj = smooth(filled, window=3)
 
-    # "Barely moving" = speed below a small fraction of the total jump travel,
-    # so the threshold scales with the clip rather than being a magic number.
-    jump_travel = max(traj) - min(traj)
-    threshold = max(0.002, jump_travel * 0.05)
-
-    # Find the longest run of consecutive low-speed frames.
-    best_start = best_end = None
-    best_len = 0
-    run_start = 0
-    for i in range(len(speeds) + 1):
-        moving = i == len(speeds) or speeds[i] > threshold
-        if moving:
-            run_len = i - run_start
-            if run_len > best_len:
-                best_len = run_len
-                best_start, best_end = run_start, i  # frames [run_start, i]
-            run_start = i + 1
-
-    if best_len >= min_len and best_start is not None:
-        # end index in speeds maps to frame best_end (inclusive of that frame).
-        return (best_start, min(best_end, airborne_peak_frame - 1))
-    return None
+    return _longest_low_motion_run(traj, start, end, min_len)
 
 
 # ============================================================

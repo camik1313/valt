@@ -18,11 +18,12 @@ from app.models.schemas import (
     LessScore,
     Metric,
     PartialScore,
+    ProtocolCheck,
     QuestionnaireAnswers,
     RiskScore,
 )
 from app.services import storage
-from app.cv import pipeline, mock_pipeline
+from app.cv import calibration, pipeline, mock_pipeline
 from app.risk import scoring as risk_scoring
 from app.risk import less as less_scoring
 
@@ -164,6 +165,64 @@ def _to_less_score_schema(result: less_scoring.LessResult) -> LessScore:
     )
 
 
+def _to_protocol_check_schema(result: calibration.ProtocolCheckResult) -> ProtocolCheck:
+    """Convert cv/calibration.py's plain-dataclass result into the Pydantic
+    schema that goes out over the wire."""
+    return ProtocolCheck(
+        box_height_cm=result.box_height_cm,
+        landing_distance_cm=result.landing_distance_cm,
+        landing_distance_target_cm=result.landing_distance_target_cm,
+        landing_distance_delta_cm=result.landing_distance_delta_cm,
+        confident=result.confident,
+        note=result.note,
+    )
+
+
+def _merge_protocol_checks(
+    primary: calibration.ProtocolCheckResult | None,
+    side: calibration.ProtocolCheckResult | None,
+    primary_view: str,
+    side_view: str,
+) -> calibration.ProtocolCheckResult | None:
+    """
+    Combine calibration from up to two clips into one result. Landing
+    distance is far more reliable from a SIDE-ON camera (a front-on view
+    foreshortens forward motion toward the lens), so when both clips give
+    a confident reading, prefer the side-view clip's landing-distance
+    figure; box height is equally visible from either angle, so just take
+    whichever clip resolved it. Falls back to whichever single result is
+    confident, or None if neither is.
+    """
+    if primary is None:
+        return side
+    if side is None:
+        return primary
+    if not primary.confident and not side.confident:
+        # Neither is trustworthy; surface the primary clip's note as the
+        # explanation (arbitrary but consistent — matches how `notes`
+        # elsewhere in this file always leads with the primary clip).
+        return primary
+    if not primary.confident:
+        return side
+    if not side.confident:
+        return primary
+
+    # Both confident: prefer side-view landing distance, either view's box
+    # height (arbitrarily the side clip's, for a single consistent source).
+    side_is_landing_source = side_view == "side"
+    landing_source = side if side_is_landing_source else primary
+    return calibration.ProtocolCheckResult(
+        box_height_cm=side.box_height_cm,
+        landing_distance_cm=landing_source.landing_distance_cm,
+        landing_distance_target_cm=landing_source.landing_distance_target_cm,
+        landing_distance_delta_cm=landing_source.landing_distance_delta_cm,
+        confident=True,
+        note=(
+            f"{primary.note} Also measured from the {side_view} clip: {side.note}"
+        ),
+    )
+
+
 def _band(key: str, value: float) -> str:
     """Convert a raw measurement into ok / watch / flag."""
     # Flexion is inverted: LOW flexion (a stiff landing) is the concern.
@@ -285,6 +344,9 @@ def build_analysis(
     less_questionnaire: LessQuestionnaireAnswers | None = None,
     side_video_path: str | None = None,
     side_video_filename: str | None = None,
+    athlete_height_cm: float | None = None,
+    ground_window_seconds: tuple[float, float] | None = None,
+    box_window_seconds: tuple[float, float] | None = None,
 ) -> Analysis:
     """
     Run the pipeline on a video and assemble a full Analysis.
@@ -309,7 +371,14 @@ def build_analysis(
     # ---- 1) Primary clip ----
     if USE_REAL_PIPELINE and video_path:
         try:
-            result = pipeline.run_pipeline(seed=upload_id, video_path=video_path, view=view)
+            result = pipeline.run_pipeline(
+                seed=upload_id,
+                video_path=video_path,
+                view=view,
+                athlete_height_cm=athlete_height_cm,
+                ground_window_seconds=ground_window_seconds,
+                box_window_seconds=box_window_seconds,
+            )
         except Exception as exc:
             result = mock_pipeline.run_pipeline(seed=upload_id)
             used_mock = True
@@ -323,18 +392,28 @@ def build_analysis(
     less_raw: dict[str, float] = dict(getattr(result, "less_raw", {}) or {})
     notes: list[str] = list(result.notes)
     views_used = [view]
+    protocol_check_result = getattr(result, "protocol_check", None)
 
     # ---- 2) Optional second clip, opposite angle, same session ----
     if not used_mock and side_video_path:
         side_view = "side" if view == "front" else "front"
         try:
             side_result = pipeline.run_pipeline(
-                seed=f"{upload_id}-side", video_path=side_video_path, view=side_view
+                seed=f"{upload_id}-side",
+                video_path=side_video_path,
+                view=side_view,
+                athlete_height_cm=athlete_height_cm,
+                ground_window_seconds=ground_window_seconds,
+                box_window_seconds=box_window_seconds,
             )
             measurements.update(side_result.measurements)
             less_raw.update(getattr(side_result, "less_raw", {}) or {})
             notes.extend(side_result.notes)
             views_used.append(side_view)
+            protocol_check_result = _merge_protocol_checks(
+                protocol_check_result, getattr(side_result, "protocol_check", None),
+                primary_view=view, side_view=side_view,
+            )
         except Exception as exc:
             notes.append(
                 f"The {side_view}-view clip from this session couldn't be analyzed "
@@ -374,11 +453,18 @@ def build_analysis(
         )
         less_score_schema = _to_less_score_schema(less_result)
 
-    # ---- 6) Summary ----
+    # ---- 6) Protocol check (measured box height / landing distance) ----
+    # Not computed when a mock fallback was used — there's no real video to
+    # measure a real box height or landing distance from.
+    protocol_check_schema = None
+    if not used_mock and protocol_check_result is not None:
+        protocol_check_schema = _to_protocol_check_schema(protocol_check_result)
+
+    # ---- 7) Summary ----
     view_label = "+".join(views_used)
     summary = _build_summary(athlete_name, used_mock, fallback_reason, metrics_list, less_result, notes)
 
-    # ---- 7) Assemble ----
+    # ---- 8) Assemble ----
     combined_filename = video_filename
     if side_video_filename:
         combined_filename = f"{video_filename} + {side_video_filename}"
@@ -393,4 +479,5 @@ def build_analysis(
         summary=summary,
         risk_score=risk_score,
         less_score=less_score_schema,
+        protocol_check=protocol_check_schema,
     )

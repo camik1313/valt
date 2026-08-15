@@ -69,13 +69,20 @@ export async function uploadVideo(file: File): Promise<UploadResult> {
 // plane criteria instead of just one.
 // `lessQuestionnaire` answers the 3 LESS items no camera can score (foot
 // rotation x2, overall impression) — also optional.
+// `athleteHeightCm`, `groundWindowSeconds`, and `boxWindowSeconds` are only
+// meaningful for the guided box-jump capture flow (see capture/page.tsx) —
+// omit them for the plain file-upload fallback, which has no box-jump
+// choreography to calibrate against.
 export async function analyzeVideo(
   uploadId: string,
   athleteName: string,
   view: CameraView,
   questionnaire?: QuestionnaireAnswers,
   sideUploadId?: string,
-  lessQuestionnaire?: LessQuestionnaireAnswers
+  lessQuestionnaire?: LessQuestionnaireAnswers,
+  athleteHeightCm?: number,
+  groundWindowSeconds?: [number, number],
+  boxWindowSeconds?: [number, number]
 ): Promise<Analysis> {
   const res = await fetch(`${API_URL}/analyze`, {
     method: "POST",
@@ -87,6 +94,9 @@ export async function analyzeVideo(
       questionnaire,
       sideUploadId,
       lessQuestionnaire,
+      athleteHeightCm,
+      groundWindowSeconds,
+      boxWindowSeconds,
     }),
   });
   return handle<Analysis>(res);

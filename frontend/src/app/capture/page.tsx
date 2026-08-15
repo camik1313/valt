@@ -7,17 +7,25 @@
 // Records a jump-landing video in the browser with on-screen (and now
 // audible) guidance so the clip ALWAYS has the structure the science
 // needs:
-//   [ stand still (baseline) ] -> [ JUMP ] -> [ hold the landing ]
+//   [ stand still (baseline) ] -> [ JUMP ] -> [ land, then rebound-jump ]
 //
 // The standing segment at the start is exactly what the backend's
 // auto-baseline detector looks for — so guided captures get
 // perspective-corrected valgus automatically.
 //
+// WHY REBOUND, NOT HOLD: the real LESS protocol has the athlete jump
+// immediately into a second max-effort vertical jump right after landing,
+// specifically so they don't consciously brace or "stick" the landing for
+// the camera — that self-conscious stillness would change the very
+// mechanics being measured. The landing-frame detector only needs the
+// brief moment of peak flexion right after touchdown, which happens well
+// before the rebound jump's takeoff either way.
+//
 // FULLY AUTOMATIC RECORDING: there's no "Stop recording" button anymore.
 // The JUMP cue holds for roughly as long as an average jump takes (reaction
 // + takeoff + brief airborne time), then the app automatically guides a
-// short "hold your landing" period and stops recording on its own — one
-// less thing to fumble with mid-jump. Short beeps mark each countdown
+// short "land, then jump again" period and stops recording on its own —
+// one less thing to fumble with mid-jump. Short beeps mark each countdown
 // step and phase change so you don't have to watch the screen closely.
 //
 // TWO-ANGLE SESSION: after the first clip, the athlete is guided to turn
@@ -30,17 +38,28 @@
 //
 // FLOW (state machine in `phase`, `clipIndex` tracks which of the up-to-2
 // clips is currently being recorded/reviewed):
-//   setup         -> checklist + athlete name + starting angle, then "Open camera"
+//   setup         -> checklist + athlete name + height + starting angle, then "Open camera"
 //   ready         -> live camera preview (flip front/back here), "Start recording"
 //   positioning   -> ~5s to walk into frame (NOT yet recording), beeps each second
-//   standing      -> 3s "stand still" countdown (recording starts here), beeps
+//   standing      -> 3s "stand still" ON THE GROUND (recording starts here), beeps
+//   box_step      -> 3s "step onto your box" (box-height calibration), beeps
 //   jump          -> big "JUMP!" cue, auto-timed to ~an average jump, then auto-advances
-//   hold          -> "hold your landing" cue, auto-timed, then auto-stops recording
+//   rebound       -> "land, then jump again" cue, auto-timed, then auto-stops recording
 //   review        -> play back the clip; continue/retake/skip
 //   transition    -> guided "turn to the other angle" instructions (clip 1 -> 2 only)
 //   questionnaire -> ONE required questionnaire, asked once you've seen your landing
 //   uploading / processing -> hand off to the existing analyze pipeline
 //   error         -> camera or analysis problem (only place /analyze is offered, as a fallback)
+//
+// GUIDED BOX-JUMP PROTOCOL: this follows the real Landing Error Scoring
+// System setup (Padua et al. 2009) — jump forward off a ~12in/31cm box,
+// land on a mark placed at half the athlete's height, then rebound. The
+// app doesn't just instruct this, it MEASURES it: the standing (ground)
+// and box_step phases each give the backend a known window of the video
+// to calibrate real-world scale from the athlete's own body (using their
+// self-reported height), so the actual box height and landing distance
+// used get reported back, deviation and all, rather than assumed. See
+// backend/app/cv/calibration.py.
 //
 // Uses the browser MediaRecorder + getUserMedia APIs, plus the Web Audio
 // API for the countdown beeps (synthesized, no audio file needed).
@@ -65,8 +84,9 @@ type Phase =
   | "ready"
   | "positioning"
   | "standing"
+  | "box_step"
   | "jump"
-  | "hold"
+  | "rebound"
   | "review"
   | "transition"
   | "questionnaire"
@@ -77,11 +97,15 @@ type Phase =
 type RecordedClip = { blob: Blob; url: string; ext: string };
 type FacingMode = "environment" | "user";
 
-// Timing for the guided phases (seconds).
-const POSITION_SECONDS = 5;  // time to walk into frame after tapping record
-const STANDING_SECONDS = 3;  // baseline period that must be recorded
-const JUMP_SECONDS = 1.3;    // roughly the reaction + takeoff + airborne time of an average jump
-const HOLD_SECONDS = 2;      // stay still after landing so the frame the pipeline needs is clean
+// Timing for the guided phases (seconds). The backend calibrates real-world
+// scale from the ground/box windows these durations define — see
+// groundWindowSeconds/boxWindowSeconds sent in finish() below, which must
+// stay in sync with these constants.
+const POSITION_SECONDS = 5;   // time to walk into frame after tapping record
+const STANDING_SECONDS = 3;   // baseline period, ON THE GROUND (ground-calibration window)
+const BOX_STEP_SECONDS = 3;   // stand on the box, toes at the edge (box-calibration window)
+const JUMP_SECONDS = 1.3;     // roughly the reaction + takeoff + airborne time of an average jump
+const REBOUND_SECONDS = 2;    // land, then rebound-jump — plenty of buffer for the takeoff
 
 function viewLabel(v: CameraView): string {
   return v === "front" ? "front-on" : "side-on";
@@ -103,6 +127,12 @@ export default function CapturePage() {
 
   const [phase, setPhase] = useState<Phase>("setup");
   const [athleteName, setAthleteName] = useState("Athlete");
+  // Athlete height, feet + inches (converted to cm at submit time). Needed
+  // to compute the personalized landing-mark distance (half of height) and
+  // as the real-world scale reference for box-height/landing-distance
+  // calibration — see calibration.py on the backend.
+  const [heightFeet, setHeightFeet] = useState<number | null>(null);
+  const [heightInches, setHeightInches] = useState<number | null>(null);
   const [view, setView] = useState<CameraView>("front"); // starting angle (clip 1)
   const [clipIndex, setClipIndex] = useState<0 | 1>(0);
   const [facing, setFacing] = useState<FacingMode>("environment");
@@ -114,6 +144,23 @@ export default function CapturePage() {
 
   const otherView: CameraView = view === "front" ? "side" : "front";
   const currentClipView: CameraView = clipIndex === 0 ? view : otherView;
+
+  // Height in cm, only once both feet and inches are entered. Drives the
+  // live landing-mark instruction below and the backend calibration.
+  const heightCm =
+    heightFeet !== null && heightInches !== null
+      ? (heightFeet * 12 + heightInches) * 2.54
+      : null;
+  // LESS protocol: land on a mark at half the athlete's height, measured
+  // from the base of the box.
+  const targetMarkCm = heightCm !== null ? heightCm / 2 : null;
+
+  function formatFeetInches(cm: number): string {
+    const totalInches = cm / 2.54;
+    const feet = Math.floor(totalInches / 12);
+    const inches = Math.round(totalInches % 12);
+    return `${feet} ft ${inches} in`;
+  }
 
   // Refs to browser objects that live outside React's render cycle.
   const videoRef = useRef<HTMLVideoElement | null>(null);      // live preview
@@ -150,7 +197,7 @@ export default function CapturePage() {
   useEffect(() => {
     const isCameraPhase =
       phase === "ready" || phase === "positioning" || phase === "standing" ||
-      phase === "jump" || phase === "hold";
+      phase === "box_step" || phase === "jump" || phase === "rebound";
     if (isCameraPhase && videoRef.current && streamRef.current) {
       videoRef.current.srcObject = streamRef.current;
     }
@@ -271,25 +318,38 @@ export default function CapturePage() {
     recorder.start();
     recorderRef.current = recorder;
 
-    // Phase 2: standing baseline countdown (recorded).
+    // Phase 2: standing baseline countdown, ON THE GROUND (recorded). This
+    // is also the ground-calibration window the backend uses to establish
+    // real-world scale — see groundWindowSeconds in finish() below.
     setPhase("standing");
-    runCountdown(STANDING_SECONDS, () => beginJumpAndHold());
+    runCountdown(STANDING_SECONDS, () => beginBoxStep());
   }
 
-  // Phase 3+4, fully automatic: JUMP cue for ~ an average jump's duration,
-  // then a guided landing hold, then the recording stops itself.
-  function beginJumpAndHold() {
+  // Phase 3: step onto the box and stand at the edge. This is the
+  // box-calibration window (box-height measurement) — see
+  // boxWindowSeconds in finish() below.
+  function beginBoxStep() {
+    playBeep(988, 150); // "step up now"
+    setPhase("box_step");
+    runCountdown(BOX_STEP_SECONDS, () => beginJumpAndRebound());
+  }
+
+  // Phase 4+5, fully automatic: JUMP cue for ~ an average jump's duration,
+  // then a guided rebound (land, then immediately jump again), then the
+  // recording stops itself. Landing on a still, held pose is deliberately
+  // NOT what's cued here — see the module docstring's "WHY REBOUND" note.
+  function beginJumpAndRebound() {
     playBeep(1400, 250); // the "go" signal
     setPhase("jump");
     timersRef.current.push(
       setTimeout(() => {
-        playBeep(660, 150); // "you should be landing about now, hold still"
-        setPhase("hold");
+        playBeep(660, 150); // "you should be landing about now, jump again"
+        setPhase("rebound");
         timersRef.current.push(
           setTimeout(() => {
             playBeep(1046, 200); // done
             recorderRef.current?.stop(); // triggers onstop -> review
-          }, HOLD_SECONDS * 1000)
+          }, REBOUND_SECONDS * 1000)
         );
       }, JUMP_SECONDS * 1000)
     );
@@ -392,7 +452,10 @@ export default function CapturePage() {
         view,
         requiredAnswers,
         sideUploadId,
-        requiredAnswers
+        requiredAnswers,
+        heightCm ?? undefined,
+        [0, STANDING_SECONDS],
+        [STANDING_SECONDS, STANDING_SECONDS + BOX_STEP_SECONDS]
       );
 
       stopStream();
@@ -408,10 +471,11 @@ export default function CapturePage() {
   const processingStage: ProcessingStage =
     phase === "uploading" ? "uploading" : phase === "processing" ? "processing" : "idle";
 
-  const recording = phase === "standing" || phase === "jump" || phase === "hold";
+  const recording =
+    phase === "standing" || phase === "box_step" || phase === "jump" || phase === "rebound";
   const cameraPhase =
     phase === "ready" || phase === "positioning" || phase === "standing" ||
-    phase === "jump" || phase === "hold";
+    phase === "box_step" || phase === "jump" || phase === "rebound";
 
   return (
     <section className="mx-auto max-w-2xl px-6 py-12">
@@ -433,9 +497,20 @@ export default function CapturePage() {
             <li className="flex gap-2"><span className="text-track">2.</span> Stand back 3–4 m (10–13 ft) so the whole body fits in frame.</li>
             <li className="flex gap-2"><span className="text-track">3.</span> Center the camera squarely on the athlete, not off to one side.</li>
             <li className="flex gap-2"><span className="text-track">4.</span> Good, even lighting. Fitted clothing works best.</li>
-            <li className="flex gap-2"><span className="text-track">5.</span> After you tap record: {POSITION_SECONDS}s to get in position, a {STANDING_SECONDS}s &quot;stand still&quot;, a JUMP cue, then a moment to hold your landing. All automatic, with beeps to guide you, no need to tap stop.</li>
-            <li className="flex gap-2"><span className="text-track">6.</span> Afterward you&apos;ll be guided to turn and record the opposite angle too (optional, but it roughly doubles what the screening score can see).</li>
-            <li className="flex gap-2"><span className="text-track">7.</span> A few required questions come right after recording, once you&apos;ve seen your landing.</li>
+            <li className="flex gap-2"><span className="text-track">5.</span> You&apos;ll need something about 12in (31cm) high to jump off, a stable stair step, a sturdy stool, or a low box. Exact height doesn&apos;t matter, we measure whatever you use.</li>
+            <li className="flex gap-2">
+              <span className="text-track">6.</span>
+              <span>
+                {targetMarkCm !== null ? (
+                  <>Place a mark (tape, a towel, anything visible) about <strong className="text-ink">{formatFeetInches(targetMarkCm)}</strong> in front of the box, that&apos;s roughly where you should land.</>
+                ) : (
+                  <>Enter your height below to see exactly where to place your landing mark.</>
+                )}
+              </span>
+            </li>
+            <li className="flex gap-2"><span className="text-track">7.</span> After you tap record: {POSITION_SECONDS}s to get in position, a {STANDING_SECONDS}s &quot;stand still&quot; on the ground, a few seconds to step onto your box, a JUMP cue, then land and immediately jump again as high as you can. All automatic, with beeps to guide you, no need to tap stop.</li>
+            <li className="flex gap-2"><span className="text-track">8.</span> Afterward you&apos;ll be guided to turn and record the opposite angle too (optional, but it roughly doubles what the screening score can see).</li>
+            <li className="flex gap-2"><span className="text-track">9.</span> A few required questions come right after recording, once you&apos;ve seen your landing.</li>
           </ul>
 
           <label className="mt-6 block text-sm font-medium text-ink">
@@ -448,6 +523,41 @@ export default function CapturePage() {
               placeholder="e.g. Jordan Lee"
             />
           </label>
+
+          <fieldset className="mt-4">
+            <legend className="text-sm font-medium text-ink">Height</legend>
+            <p className="mt-1 text-xs text-muted">
+              Used to compute your landing-mark distance and to measure your
+              box height and landing distance from the video, no tape measure
+              required.
+            </p>
+            <div className="mt-2 flex gap-2">
+              <label className="flex-1 text-xs text-muted">
+                Feet
+                <input
+                  type="number"
+                  min={2}
+                  max={8}
+                  value={heightFeet ?? ""}
+                  onChange={(e) => setHeightFeet(e.target.value === "" ? null : Number(e.target.value))}
+                  className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink focus:border-track focus:outline-none focus:ring-2 focus:ring-track/30"
+                  placeholder="5"
+                />
+              </label>
+              <label className="flex-1 text-xs text-muted">
+                Inches
+                <input
+                  type="number"
+                  min={0}
+                  max={11}
+                  value={heightInches ?? ""}
+                  onChange={(e) => setHeightInches(e.target.value === "" ? null : Number(e.target.value))}
+                  className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm text-ink focus:border-track focus:outline-none focus:ring-2 focus:ring-track/30"
+                  placeholder="6"
+                />
+              </label>
+            </div>
+          </fieldset>
 
           <fieldset className="mt-4">
             <legend className="text-sm font-medium text-ink">Starting angle</legend>
@@ -476,7 +586,19 @@ export default function CapturePage() {
           </fieldset>
 
           <div className="mt-6">
-            <Button onClick={() => openCamera()} variant="primary" className="w-full">Open camera</Button>
+            <Button
+              onClick={() => openCamera()}
+              variant="primary"
+              className="w-full"
+              disabled={heightCm === null}
+            >
+              Open camera
+            </Button>
+            {heightCm === null && (
+              <p className="mt-2 text-center text-xs text-muted">
+                Enter your height above to continue.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -525,13 +647,16 @@ export default function CapturePage() {
               <Overlay label="Get in position" big={String(countdown)} />
             )}
             {phase === "standing" && (
-              <Overlay label="Stand still" big={String(countdown)} />
+              <Overlay label="Stand still on the ground" big={String(countdown)} />
+            )}
+            {phase === "box_step" && (
+              <Overlay label="Step onto your box, toes at the edge" big={String(countdown)} />
             )}
             {phase === "jump" && (
-              <Overlay label="" big="JUMP!" tone="risk" />
+              <Overlay label="Off the box" big="JUMP!" tone="risk" />
             )}
-            {phase === "hold" && (
-              <Overlay label="Stay still for the landing" big="HOLD" />
+            {phase === "rebound" && (
+              <Overlay label="Land, then jump again!" big="REBOUND" />
             )}
           </div>
 
@@ -548,7 +673,8 @@ export default function CapturePage() {
                 )}
               </>
             )}
-            {(phase === "positioning" || phase === "standing" || phase === "jump" || phase === "hold") && (
+            {(phase === "positioning" || phase === "standing" || phase === "box_step" ||
+              phase === "jump" || phase === "rebound") && (
               <p className="text-sm text-muted">Recording will guide you automatically…</p>
             )}
           </div>

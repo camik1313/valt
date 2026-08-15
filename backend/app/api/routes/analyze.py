@@ -48,6 +48,9 @@ async def analyze_video(request: AnalyzeRequest):
         less_questionnaire=request.less_questionnaire,
         side_video_path=side_video_path,
         side_video_filename=side_video_filename,
+        athlete_height_cm=request.athlete_height_cm,
+        ground_window_seconds=request.ground_window_seconds,
+        box_window_seconds=request.box_window_seconds,
     )
 
     # Persist it so it appears in history and can be reopened by id.

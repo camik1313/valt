@@ -56,10 +56,6 @@ export default function Footer() {
           </p>
         </div>
 
-        <p className="mt-6 text-xs text-muted">
-          © {new Date().getFullYear()} VALT. Built for ISEF &amp; the
-          Congressional App Challenge.
-        </p>
       </div>
     </footer>
   );

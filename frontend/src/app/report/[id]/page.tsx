@@ -18,6 +18,7 @@ import MetricCard from "@/components/report/MetricCard";
 import ReportChart from "@/components/report/ReportChart";
 import RiskScoreCard from "@/components/risk/RiskScoreCard";
 import LessScoreCard from "@/components/risk/LessScoreCard";
+import ProtocolCheckCard from "@/components/risk/ProtocolCheckCard";
 import Button from "@/components/ui/Button";
 
 export default function ReportPage({ params }: { params: { id: string } }) {
@@ -108,6 +109,13 @@ export default function ReportPage({ params }: { params: { id: string } }) {
           <MetricCard key={m.key} metric={m} />
         ))}
       </div>
+
+      {/* Box-jump protocol fidelity — context for the LESS card below it */}
+      {analysis.protocolCheck && (
+        <div className="mt-8">
+          <ProtocolCheckCard protocolCheck={analysis.protocolCheck} />
+        </div>
+      )}
 
       {/* LESS score — the real, cited 17-item assessment */}
       <div className="mt-8">

@@ -123,6 +123,24 @@ export type LessScore = {
   cutoffCitation: string;
 };
 
+// ============================================================
+// PROTOCOL CHECK — mirrors backend/app/cv/calibration.py. Not a score;
+// it's a measured record of whether the real LESS box-jump setup (12in
+// box, land at half the athlete's height) was actually followed, derived
+// from the athlete's own body in the video rather than trusted from
+// manual entry. null whenever calibration wasn't attempted (height not
+// given, or a clip not from the guided box-jump capture flow) or wasn't
+// confident enough to report.
+// ============================================================
+export type ProtocolCheck = {
+  boxHeightCm: number | null;
+  landingDistanceCm: number | null;
+  landingDistanceTargetCm: number | null;
+  landingDistanceDeltaCm: number | null;
+  confident: boolean;
+  note: string;
+};
+
 // A single completed analysis of one video.
 export type Analysis = {
   id: string;
@@ -139,6 +157,9 @@ export type Analysis = {
   riskScore: RiskScore | null;
   // The real, cited LESS score. Also null on mock fallback.
   lessScore: LessScore | null;
+  // Measured box-jump protocol fidelity. null when calibration wasn't
+  // available for this analysis (see ProtocolCheck above).
+  protocolCheck: ProtocolCheck | null;
 };
 
 // The status the upload screen moves through.

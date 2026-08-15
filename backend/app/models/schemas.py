@@ -130,6 +130,22 @@ class LessScore(CamelModel):
     cutoff_citation: str
 
 
+# ============================================================
+# PROTOCOL CHECK — see backend/app/cv/calibration.py. NOT a score: this is
+# a measured record of whether the real LESS box-jump setup (12in/31cm
+# box, land at half the athlete's height) was actually followed, derived
+# from the athlete's own body in the video rather than a manually-entered
+# box height. None whenever calibration wasn't attempted or confident.
+# ============================================================
+class ProtocolCheck(CamelModel):
+    box_height_cm: float | None = None
+    landing_distance_cm: float | None = None
+    landing_distance_target_cm: float | None = None
+    landing_distance_delta_cm: float | None = None
+    confident: bool = False
+    note: str = ""
+
+
 # ---- A complete analysis of one video ----
 class Analysis(CamelModel):
     id: str
@@ -146,6 +162,9 @@ class Analysis(CamelModel):
     risk_score: RiskScore | None = None
     # The real, cited LESS score (see risk/less.py). Also None on mock fallback.
     less_score: LessScore | None = None
+    # Measured box-jump protocol fidelity. None when calibration wasn't
+    # available for this analysis (see ProtocolCheck above).
+    protocol_check: ProtocolCheck | None = None
 
 
 # ---- Response after uploading a video ----
@@ -175,6 +194,14 @@ class AnalyzeRequest(CamelModel):
     # rotation x2, overall impression). Omit to skip — those 3 items just
     # won't count toward the LESS total.
     less_questionnaire: LessQuestionnaireAnswers | None = None
+    # Optional box-jump protocol calibration (see cv/calibration.py). Only
+    # meaningful for the guided box-jump capture flow, which knows exactly
+    # when the athlete was standing on the ground vs. on the box; the plain
+    # upload fallback has no such choreography and should omit all three.
+    # All three must be present together to attempt calibration.
+    athlete_height_cm: float | None = None
+    ground_window_seconds: tuple[float, float] | None = None
+    box_window_seconds: tuple[float, float] | None = None
 
 
 # ---- A short entry for the history list ----

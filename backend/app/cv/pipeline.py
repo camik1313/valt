@@ -26,7 +26,7 @@
 
 from dataclasses import dataclass, field
 
-from app.cv import metrics, pose_estimator
+from app.cv import calibration, metrics, pose_estimator
 from app.cv.landing_detector import (
     detect_landing,
     detect_initial_contact,
@@ -87,6 +87,12 @@ class PipelineResult:
     # frame exactly as before this was added.
     less_raw: dict[str, float] = field(default_factory=dict)
     initial_contact_frame: int | None = None
+    # Measured box-jump protocol fidelity (box height, landing distance vs.
+    # the LESS-prescribed half-height mark) — see cv/calibration.py. None
+    # when athlete_height_cm/window hints weren't supplied (e.g. the plain
+    # upload fallback, which has no guided box-jump choreography to
+    # calibrate against). NOT a scored measurement, purely disclosed context.
+    protocol_check: calibration.ProtocolCheckResult | None = None
 
 
 def _point(landmarks, index: int) -> tuple[float, float]:
@@ -114,7 +120,14 @@ def _nearest_valid_frame(per_frame, target: int) -> int | None:
     return None
 
 
-def run_pipeline(seed: str, video_path: str, view: str = VIEW_FRONT) -> PipelineResult:
+def run_pipeline(
+    seed: str,
+    video_path: str,
+    view: str = VIEW_FRONT,
+    athlete_height_cm: float | None = None,
+    ground_window_seconds: tuple[float, float] | None = None,
+    box_window_seconds: tuple[float, float] | None = None,
+) -> PipelineResult:
     """
     Analyze a jump-landing video from a known camera view.
 
@@ -123,6 +136,11 @@ def run_pipeline(seed: str, video_path: str, view: str = VIEW_FRONT) -> Pipeline
         video_path: the video file on disk.
         view: "front" or "side". Determines which measurements are valid
             and therefore which ones we compute at all.
+        athlete_height_cm, ground_window_seconds, box_window_seconds:
+            optional box-jump protocol calibration (see cv/calibration.py).
+            All three must be present to attempt calibration; omit any of
+            them to skip it entirely (e.g. the plain upload fallback path,
+            which has no guided box-jump choreography).
 
     Raises:
         ValueError: unreadable video, no pose found, or an unknown view.
@@ -475,6 +493,19 @@ def run_pipeline(seed: str, video_path: str, view: str = VIEW_FRONT) -> Pipeline
 
     notes.append(initial_contact.note)
 
+    # ---- 4) Box-jump protocol calibration (optional) ----
+    protocol_check = None
+    if athlete_height_cm is not None and ground_window_seconds is not None and box_window_seconds is not None:
+        protocol_check = calibration.compute_protocol_check(
+            extraction.per_frame,
+            landing_frame=landing.landing_frame,
+            athlete_height_cm=athlete_height_cm,
+            fps=extraction.fps,
+            ground_window_seconds=ground_window_seconds,
+            box_window_seconds=box_window_seconds,
+        )
+        notes.append(protocol_check.note)
+
     return PipelineResult(
         landing_frame=landing.landing_frame,
         measurements=measurements,
@@ -484,4 +515,5 @@ def run_pipeline(seed: str, video_path: str, view: str = VIEW_FRONT) -> Pipeline
         confident=landing.confident and extraction.detection_rate >= 0.7,
         less_raw=less_raw,
         initial_contact_frame=initial_contact.frame,
+        protocol_check=protocol_check,
     )

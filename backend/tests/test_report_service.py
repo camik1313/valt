@@ -98,7 +98,7 @@ def _fake_side_view_result() -> PipelineResult:
 
 
 def test_combined_clip_merges_measurements_and_widens_risk_score():
-    def side_effect(seed, video_path, view):
+    def side_effect(seed, video_path, view, **_kwargs):
         return _fake_side_view_result() if view == "side" else _fake_front_view_result()
 
     with patch("app.services.report_service.pipeline.run_pipeline", side_effect=side_effect):
@@ -126,7 +126,7 @@ def test_combined_clip_merges_measurements_and_widens_risk_score():
 
 
 def test_side_clip_failure_keeps_primary_clip_real_result():
-    def side_effect(seed, video_path, view):
+    def side_effect(seed, video_path, view, **_kwargs):
         if view == "side":
             raise ValueError("no body detected in side clip")
         return _fake_front_view_result()
