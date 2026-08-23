@@ -8,7 +8,10 @@
 # for (see cv/pipeline.py's PipelineResult).
 # ============================================================
 
+import os
 from unittest.mock import patch
+
+import pytest
 
 from app.cv.pipeline import PipelineResult
 from app.models.schemas import QuestionnaireAnswers
@@ -161,3 +164,104 @@ def test_no_side_clip_behaves_as_a_single_clip_analysis():
         )
     assert analysis.view == "front"
     assert analysis.video_filename == "front.mp4"
+
+
+# ---- Primary-clip failure: must raise, never fabricate a result ----
+
+def test_primary_clip_failure_raises_instead_of_falling_back_to_mock():
+    """
+    A REAL video that the pipeline can't analyze (corrupted, no body
+    detected, wrong orientation, etc.) must surface that specific error,
+    not silently substitute fabricated numbers. This is the behavior
+    change from the old "any pipeline exception -> mock fallback" design.
+    """
+    with patch(
+        "app.services.report_service.pipeline.run_pipeline",
+        side_effect=ValueError("No body was detected in this video."),
+    ):
+        with pytest.raises(ValueError, match="No body was detected"):
+            report_service.build_analysis(
+                upload_id="test123",
+                athlete_name="Test Athlete",
+                video_filename="jump.mp4",
+                video_path="/fake/path.mp4",
+                view="front",
+            )
+
+
+def test_video_path_none_still_uses_mock_deliberately():
+    """
+    The video_path=None path is a deliberate dev/demo toggle (no file to
+    analyze at all), not a failure fallback — it must keep working exactly
+    as before, clearly labeled as a simulated result.
+    """
+    analysis = report_service.build_analysis(
+        upload_id="test123",
+        athlete_name="Test Athlete",
+        video_filename="jump.mp4",
+        video_path=None,
+    )
+    assert analysis.risk_score is None
+    assert "SIMULATED RESULT" in analysis.summary
+
+
+# ---- Video deletion: the raw file should never outlive the analysis ----
+
+def test_video_deleted_after_successful_analysis(tmp_path):
+    video_path = tmp_path / "front.mp4"
+    video_path.write_bytes(b"fake video bytes")
+
+    with patch("app.services.report_service.pipeline.run_pipeline", return_value=_fake_front_view_result()):
+        report_service.build_analysis(
+            upload_id="test123",
+            athlete_name="Test Athlete",
+            video_filename="front.mp4",
+            video_path=str(video_path),
+            view="front",
+        )
+
+    assert not os.path.exists(video_path)
+
+
+def test_both_videos_deleted_after_combined_session(tmp_path):
+    front_path = tmp_path / "front.mp4"
+    side_path = tmp_path / "side.mp4"
+    front_path.write_bytes(b"fake front bytes")
+    side_path.write_bytes(b"fake side bytes")
+
+    def side_effect(seed, video_path, view, **_kwargs):
+        return _fake_side_view_result() if view == "side" else _fake_front_view_result()
+
+    with patch("app.services.report_service.pipeline.run_pipeline", side_effect=side_effect):
+        report_service.build_analysis(
+            upload_id="test123",
+            athlete_name="Test Athlete",
+            video_filename="front.mp4",
+            video_path=str(front_path),
+            view="front",
+            side_video_path=str(side_path),
+            side_video_filename="side.mp4",
+        )
+
+    assert not os.path.exists(front_path)
+    assert not os.path.exists(side_path)
+
+
+def test_video_deleted_after_primary_failure(tmp_path):
+    video_path = tmp_path / "front.mp4"
+    video_path.write_bytes(b"corrupted bytes")
+
+    with patch(
+        "app.services.report_service.pipeline.run_pipeline",
+        side_effect=ValueError("Couldn't open this video file."),
+    ):
+        with pytest.raises(ValueError):
+            report_service.build_analysis(
+                upload_id="test123",
+                athlete_name="Test Athlete",
+                video_filename="front.mp4",
+                video_path=str(video_path),
+                view="front",
+            )
+
+    assert not os.path.exists(video_path)

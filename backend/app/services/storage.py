@@ -113,3 +113,16 @@ def find_upload_path(upload_id: str) -> str | None:
         if filename.startswith(upload_id):
             return os.path.join(settings.upload_dir, filename)
     return None
+
+
+def delete_video(path: str | None) -> None:
+    """
+    Remove a saved video from disk once it's no longer needed: after a
+    successful analysis (the raw video isn't needed once we have the
+    measurements), or immediately after a failed one (no reason to keep
+    an unusable file around). Takes a resolved path rather than an
+    upload_id since report_service already has both clips' paths on
+    hand either way. Never raises if the path is missing or already gone.
+    """
+    if path and os.path.exists(path):
+        os.remove(path)

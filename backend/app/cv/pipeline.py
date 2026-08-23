@@ -204,9 +204,43 @@ def run_pipeline(
             "the full body in view."
         )
 
+    # Feet specifically (not just the leg generally) — hip/knee visible but
+    # ankle not usually means feet drifted out of frame at the bottom edge,
+    # a distinct, common filming mistake worth naming directly.
+    left_foot_cut_off = _visible(landmarks, L_HIP, L_KNEE) and not _visible(landmarks, L_ANKLE)
+    right_foot_cut_off = _visible(landmarks, R_HIP, R_KNEE) and not _visible(landmarks, R_ANKLE)
+    if left_foot_cut_off or right_foot_cut_off:
+        notes.append(
+            "Feet weren't clearly visible at the landing frame — make sure the "
+            "whole body, including both feet, stays in frame for the entire jump."
+        )
+
     shoulders_ok = _visible(landmarks, L_SHOULDER, R_SHOULDER, L_HIP, R_HIP)
     shoulder_mid = _midpoint(_point(landmarks, L_SHOULDER), _point(landmarks, R_SHOULDER))
     hip_mid = _midpoint(_point(landmarks, L_HIP), _point(landmarks, R_HIP))
+
+    # ---- Camera-orientation sanity check (heuristic, not a hard fact) ----
+    # A front view shows both shoulders spread apart; a side view collapses
+    # them to nearly the same x. This is a coarse geometric signal, not a
+    # precise measurement, so it only ever adds a note — never blocks
+    # analysis or overrides the view the athlete actually selected.
+    if shoulders_ok:
+        shoulder_sep = abs(_point(landmarks, L_SHOULDER)[0] - _point(landmarks, R_SHOULDER)[0])
+        torso_span = abs(shoulder_mid[1] - hip_mid[1])
+        if torso_span > 1e-6:
+            spread_ratio = shoulder_sep / torso_span
+            if view == VIEW_FRONT and spread_ratio < 0.15:
+                notes.append(
+                    "This clip was analyzed as a FRONT view, but the shoulders look "
+                    "nearly edge-on rather than spread apart — double-check this "
+                    "wasn't filmed from the side."
+                )
+            elif view == VIEW_SIDE and spread_ratio > 0.5:
+                notes.append(
+                    "This clip was analyzed as a SIDE view, but the shoulders look "
+                    "spread apart rather than edge-on — double-check this wasn't "
+                    "filmed from the front."
+                )
 
     if view == VIEW_FRONT:
         # --- FRONTAL PLANE: valgus (horizontal index) + lateral lean ---

@@ -22,6 +22,12 @@ import mediapipe as mp
 # One frame's landmarks, or None if no pose was found.
 Landmarks = list[tuple[float, float, float, float]] | None
 
+# A guided-capture clip runs ~11s (positioning + standing + jump + rebound).
+# This caps arbitrary uploads (the /analyze fallback) generously above that,
+# so a genuinely too-long video gets a clear rejection message instead of
+# being silently truncated at MAX_FRAMES and analyzed as if it were complete.
+MAX_VIDEO_SECONDS = 45
+
 
 @dataclass
 class PoseExtraction:
@@ -61,11 +67,27 @@ def extract_landmarks(
     """
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        raise ValueError(f"Could not open video file: {video_path}")
+        raise ValueError(
+            "Couldn't open this video file. It may be corrupted or in an "
+            "unsupported format — try re-exporting as .mp4 or .mov."
+        )
 
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    # Fail fast on an oversized upload rather than silently analyzing only
+    # its first MAX_VIDEO_SECONDS and treating that as the whole clip.
+    frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    if frame_count and fps:
+        duration_seconds = frame_count / fps
+        if duration_seconds > MAX_VIDEO_SECONDS:
+            cap.release()
+            raise ValueError(
+                f"This video is about {duration_seconds:.0f} seconds long. "
+                f"Please trim it to the jump landing itself, under "
+                f"{MAX_VIDEO_SECONDS} seconds."
+            )
 
     mp_pose = mp.solutions.pose
     pose = mp_pose.Pose(

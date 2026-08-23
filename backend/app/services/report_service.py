@@ -351,9 +351,14 @@ def build_analysis(
     """
     Run the pipeline on a video and assemble a full Analysis.
 
-    Falls back to the mock if the PRIMARY clip's real pipeline fails,
-    clearly labeled so simulated numbers can never be mistaken for
-    measurements.
+    Raises the pipeline's own ValueError if the PRIMARY clip can't be
+    analyzed (bad video, no body detected, wrong orientation, video too
+    long, etc.), rather than silently substituting fabricated mock
+    numbers. A screening report built on data that isn't real is worse
+    than no report — the caller should show the specific reason and let
+    the athlete retry that clip. The `video_path=None` / USE_REAL_PIPELINE
+    False paths are a deliberate dev/demo toggle, not a failure fallback,
+    and their output is still always labeled "SIMULATED RESULT" either way.
 
     Optionally accepts a SECOND clip from the same session, filmed from the
     opposite camera angle (see AnalyzeRequest.side_upload_id). When given
@@ -364,6 +369,12 @@ def build_analysis(
     second clip is a bonus, not a requirement: if it fails to analyze, we
     keep the primary clip's real measurements and just note that the
     second angle is missing, rather than discarding a real result.
+
+    Both uploaded video files are deleted from disk once this function is
+    done with them — on a successful analysis (the measurements are all
+    that's needed afterward) and on a failed one (no reason to keep an
+    unusable file). Only the video is deleted; the resulting Analysis
+    (measurements, no video) is what gets saved to history.
     """
     used_mock = False
     fallback_reason = ""
@@ -379,10 +390,10 @@ def build_analysis(
                 ground_window_seconds=ground_window_seconds,
                 box_window_seconds=box_window_seconds,
             )
-        except Exception as exc:
-            result = mock_pipeline.run_pipeline(seed=upload_id)
-            used_mock = True
-            fallback_reason = str(exc)
+        except Exception:
+            storage.delete_video(video_path)
+            storage.delete_video(side_video_path)
+            raise
     else:
         result = mock_pipeline.run_pipeline(seed=upload_id)
         used_mock = True
@@ -464,7 +475,13 @@ def build_analysis(
     view_label = "+".join(views_used)
     summary = _build_summary(athlete_name, used_mock, fallback_reason, metrics_list, less_result, notes)
 
-    # ---- 8) Assemble ----
+    # ---- 8) Delete both videos now that every measurement has been
+    # extracted — nothing past this point needs the raw footage. Covers
+    # the side clip whether it succeeded or failed above.
+    storage.delete_video(video_path)
+    storage.delete_video(side_video_path)
+
+    # ---- 9) Assemble ----
     combined_filename = video_filename
     if side_video_filename:
         combined_filename = f"{video_filename} + {side_video_filename}"

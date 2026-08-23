@@ -92,6 +92,7 @@ type Phase =
   | "questionnaire"
   | "uploading"
   | "processing"
+  | "partial_result"
   | "error";
 
 type RecordedClip = { blob: Blob; url: string; ext: string };
@@ -141,6 +142,11 @@ export default function CapturePage() {
   const [countdown, setCountdown] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  // Set when a session completes with only ONE view's measurements even
+  // though a second clip was submitted (e.g. the side clip couldn't be
+  // analyzed) — lets "partial_result" offer a choice instead of silently
+  // routing to a report the athlete never got to weigh in on.
+  const [pendingAnalysisId, setPendingAnalysisId] = useState<string | null>(null);
 
   const otherView: CameraView = view === "front" ? "side" : "front";
   const currentClipView: CameraView = clipIndex === 0 ? view : otherView;
@@ -382,6 +388,28 @@ export default function CapturePage() {
     setPhase("ready");
   }
 
+  // ---- Retry just the clip that failed, keeping the OTHER clip (if any)
+  // intact — the camera stream is still open in both cases below, since
+  // neither the error path nor the partial-result path calls stopStream().
+
+  function retryPrimaryClip() {
+    const current = clipsRef.current[0];
+    if (current) URL.revokeObjectURL(current.url);
+    clipsRef.current[0] = undefined;
+    setClipIndex(0);
+    setErrorMsg(null);
+    setPhase("ready");
+  }
+
+  function retrySecondClip() {
+    const current = clipsRef.current[1];
+    if (current) URL.revokeObjectURL(current.url);
+    clipsRef.current[1] = undefined;
+    setPendingAnalysisId(null);
+    setClipIndex(1);
+    setPhase("ready");
+  }
+
   // ---- Move on to guided instructions for the second (opposite) angle ----
   function goToTransition() {
     setPhase("transition");
@@ -457,6 +485,17 @@ export default function CapturePage() {
         [0, STANDING_SECONDS],
         [STANDING_SECONDS, STANDING_SECONDS + BOX_STEP_SECONDS]
       );
+
+      // A second clip was submitted but didn't make it into the result
+      // (analysis.view would be e.g. "front+side" if both had; just
+      // "front" means the side clip couldn't be analyzed server-side —
+      // see report_service.py's graceful degrade). Let the athlete choose
+      // rather than silently routing to a front-only report.
+      if (includeSecond && !analysis.view.includes("+")) {
+        setPendingAnalysisId(analysis.id);
+        setPhase("partial_result");
+        return;
+      }
 
       stopStream();
       router.push(`/report/${analysis.id}`);
@@ -782,6 +821,34 @@ export default function CapturePage() {
         </div>
       )}
 
+      {/* ---------- PARTIAL RESULT (one clip analyzed, the other didn't make it) ---------- */}
+      {phase === "partial_result" && pendingAnalysisId && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
+          <p className="font-display font-semibold text-ink">
+            We couldn&apos;t analyze your {viewLabel(otherView)} clip
+          </p>
+          <p className="mt-2 text-sm text-muted">
+            Your {viewLabel(view)} results are ready. You can continue with
+            just those, or retry recording the {viewLabel(otherView)} angle
+            (your {viewLabel(view)} clip won&apos;t need to be redone).
+          </p>
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            <Button onClick={retrySecondClip} variant="primary">
+              Retry {viewLabel(otherView)} view
+            </Button>
+            <Button
+              onClick={() => {
+                stopStream();
+                router.push(`/report/${pendingAnalysisId}`);
+              }}
+              variant="outline"
+            >
+              Continue with {viewLabel(view)} only
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* ---------- UPLOADING / PROCESSING ---------- */}
       {(phase === "uploading" || phase === "processing") && (
         <ProcessingStatus stage={processingStage} progress={progress} fileName="Your recording" />
@@ -792,7 +859,12 @@ export default function CapturePage() {
         <div className="rounded-2xl border border-risk/30 bg-risk-soft/40 p-6 text-center">
           <p className="font-display font-semibold text-ink">Something went wrong</p>
           <p className="mt-2 text-sm text-muted">{errorMsg}</p>
-          <div className="mt-5 flex justify-center gap-3">
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            {clipsRef.current[0] && (
+              <Button onClick={retryPrimaryClip} variant="primary">
+                Retry {viewLabel(view)} recording
+              </Button>
+            )}
             <Button onClick={startOver} variant="outline">Start over</Button>
             <Button href="/analyze" variant="primary">Upload a file instead</Button>
           </div>

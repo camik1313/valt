@@ -10,12 +10,30 @@
 # ============================================================
 
 import io
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from app.cv.pipeline import PipelineResult
 from app.main import app
 
 client = TestClient(app)
+
+
+def _fake_pipeline_result() -> PipelineResult:
+    return PipelineResult(
+        landing_frame=30,
+        measurements={
+            "knee_valgus_left": 0.05,
+            "knee_valgus_right": 0.05,
+            "valgus_asymmetry": 0.0,
+            "kasr": 1.0,
+            "trunk_lean_lateral": 2.0,
+        },
+        view="front",
+        notes=["fake pipeline result for testing"],
+        confident=True,
+    )
 
 
 def test_health():
@@ -46,11 +64,15 @@ def test_full_flow():
     assert up.status_code == 200
     upload_id = up.json()["uploadId"]
 
-    # 2) Analyze it.
-    an = client.post(
-        "/analyze",
-        json={"uploadId": upload_id, "athleteName": "Test Athlete"},
-    )
+    # 2) Analyze it. The uploaded bytes aren't a real video, so the real
+    # pipeline is monkeypatched here the same way test_report_service.py
+    # does — this proves the full HTTP flow, not the CV math (that's
+    # covered elsewhere).
+    with patch("app.services.report_service.pipeline.run_pipeline", return_value=_fake_pipeline_result()):
+        an = client.post(
+            "/analyze",
+            json={"uploadId": upload_id, "athleteName": "Test Athlete"},
+        )
     assert an.status_code == 200
     analysis = an.json()
     assert analysis["athleteName"] == "Test Athlete"
@@ -67,6 +89,29 @@ def test_full_flow():
     assert hist.status_code == 200
     ids = [item["id"] for item in hist.json()]
     assert analysis_id in ids
+
+
+def test_analyze_rejects_unanalyzable_video_instead_of_faking_a_result():
+    """
+    A primary clip that can't actually be analyzed (here: not a real
+    video) must return a clear error, not a silently fabricated result.
+    Previously this fell back to the mock pipeline and returned 200 with
+    fake numbers — that's exactly the failure mode this test now guards
+    against.
+    """
+    fake_video = io.BytesIO(b"\x00\x00\x00\x18ftypmp42fake-bytes")
+    up = client.post(
+        "/upload",
+        files={"file": ("jump.mp4", fake_video, "video/mp4")},
+    )
+    upload_id = up.json()["uploadId"]
+
+    an = client.post(
+        "/analyze",
+        json={"uploadId": upload_id, "athleteName": "Test Athlete"},
+    )
+    assert an.status_code == 422
+    assert an.json()["detail"]  # a specific, non-empty reason, not a generic 500
 
 
 def test_report_404():

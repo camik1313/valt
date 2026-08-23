@@ -37,21 +37,28 @@ async def analyze_video(request: AnalyzeRequest):
         if side_video_path:
             side_video_filename = side_video_path.split("/")[-1]
 
-    # Build the analysis (runs the real CV pipeline).
-    analysis = report_service.build_analysis(
-        upload_id=request.upload_id,
-        athlete_name=request.athlete_name,
-        video_filename=video_path.split("/")[-1],
-        video_path=video_path,
-        view=request.view,
-        questionnaire=request.questionnaire,
-        less_questionnaire=request.less_questionnaire,
-        side_video_path=side_video_path,
-        side_video_filename=side_video_filename,
-        athlete_height_cm=request.athlete_height_cm,
-        ground_window_seconds=request.ground_window_seconds,
-        box_window_seconds=request.box_window_seconds,
-    )
+    # Build the analysis (runs the real CV pipeline). A failure on the
+    # PRIMARY clip (bad video, no body detected, wrong orientation, too
+    # long, etc.) now raises instead of silently returning fabricated
+    # numbers — surface that specific reason so the athlete gets a real
+    # error message and can retry, not a 500 or a fake result.
+    try:
+        analysis = report_service.build_analysis(
+            upload_id=request.upload_id,
+            athlete_name=request.athlete_name,
+            video_filename=video_path.split("/")[-1],
+            video_path=video_path,
+            view=request.view,
+            questionnaire=request.questionnaire,
+            less_questionnaire=request.less_questionnaire,
+            side_video_path=side_video_path,
+            side_video_filename=side_video_filename,
+            athlete_height_cm=request.athlete_height_cm,
+            ground_window_seconds=request.ground_window_seconds,
+            box_window_seconds=request.box_window_seconds,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     # Persist it so it appears in history and can be reopened by id.
     storage.save_analysis(analysis)
