@@ -37,6 +37,7 @@ export function isQuestionnaireComplete(a: RequiredAnswers): boolean {
     a.previousAclInjury !== undefined && a.previousAclInjury !== null &&
     !!a.sex &&
     !!a.sportType &&
+    !!a.specificSport &&
     a.age !== undefined && a.age !== null && a.age > 0 &&
     !!a.activityLevel &&
     a.fatigueReported !== undefined && a.fatigueReported !== null &&
@@ -93,6 +94,28 @@ export default function RequiredQuestionnaire({ value, onChange }: Props) {
           <option value="endurance_noncontact">Endurance / non-contact (running, swimming, etc.)</option>
           <option value="other">Other</option>
         </select>
+      </label>
+
+      <label className="block text-sm font-medium text-ink">
+        Specific sport <span className="text-risk">*</span>
+        <select
+          className={selectClass}
+          value={value.specificSport ?? ""}
+          onChange={(e) => set("specificSport", e.target.value as QuestionnaireAnswers["specificSport"])}
+        >
+          <option value="" disabled>Choose one</option>
+          <option value="soccer">Soccer</option>
+          <option value="basketball">Basketball</option>
+          <option value="volleyball">Volleyball</option>
+          <option value="lacrosse">Lacrosse</option>
+          <option value="field_hockey">Field hockey</option>
+          <option value="track_field">Track &amp; field</option>
+          <option value="other">Other</option>
+        </select>
+        <span className="mt-1 block text-[11px] font-normal text-muted">
+          Used to match the exercise library. Choose &ldquo;Other&rdquo; if your sport isn&apos;t
+          listed — you&apos;ll still get recommendations, just not sport-filtered.
+        </span>
       </label>
 
       <label className="block text-sm font-medium text-ink">

@@ -281,6 +281,44 @@ def test_recommendations_computed_from_flagged_measurement():
                for i in range(len(analysis.recommendations.exercises) - 1))
 
 
+def test_recommendations_filtered_by_specific_sport():
+    questionnaire = QuestionnaireAnswers(age=16, current_pain_or_injury=False, specific_sport="soccer")
+    with patch("app.services.report_service.pipeline.run_pipeline", return_value=_fake_front_view_result()):
+        analysis = report_service.build_analysis(
+            upload_id="test123",
+            athlete_name="Test Athlete",
+            video_filename="jump.mp4",
+            video_path="/fake/path.mp4",
+            view="front",
+            questionnaire=questionnaire,
+        )
+
+    # Every exercise in the database lists the full jump/cut sport set, so
+    # a real, tracked sport like "soccer" shouldn't exclude anything.
+    assert analysis.recommendations is not None
+    assert analysis.recommendations.exercises
+
+
+def test_recommendations_not_zeroed_out_when_sport_is_other():
+    """No exercise in the database lists "other" as a sport. Passing that
+    straight through as a hard filter would silently zero out every
+    recommendation, so report_service.py must map it to "no filter"
+    instead — see _specific_sport_to_ranking_sport."""
+    questionnaire = QuestionnaireAnswers(age=16, current_pain_or_injury=False, specific_sport="other")
+    with patch("app.services.report_service.pipeline.run_pipeline", return_value=_fake_front_view_result()):
+        analysis = report_service.build_analysis(
+            upload_id="test123",
+            athlete_name="Test Athlete",
+            video_filename="jump.mp4",
+            video_path="/fake/path.mp4",
+            view="front",
+            questionnaire=questionnaire,
+        )
+
+    assert analysis.recommendations is not None
+    assert analysis.recommendations.exercises
+
+
 def test_recommendations_gated_when_current_pain_or_injury_reported():
     questionnaire = QuestionnaireAnswers(age=16, current_pain_or_injury=True)
     with patch("app.services.report_service.pipeline.run_pipeline", return_value=_fake_front_view_result()):

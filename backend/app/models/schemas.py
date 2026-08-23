@@ -48,6 +48,12 @@ class Metric(CamelModel):
 Sex = Literal["female", "male", "other", "prefer_not_to_say"]
 SportType = Literal["pivoting_cutting", "field_court_other", "endurance_noncontact", "other"]
 ActivityLevel = Literal["sedentary", "recreational", "competitive_high_school", "competitive_college_or_pro"]
+# The exercise database's own sport taxonomy (see exercises/database.py's
+# Sport type) — deliberately a separate, more specific field from
+# sport_type above. sport_type is a coarse epidemiological bucket used
+# only for the reported-factor citation; this one names an actual sport
+# so it can be used as a real filter when matching the exercise library.
+Sport = Literal["soccer", "basketball", "volleyball", "lacrosse", "field_hockey", "track_field", "other"]
 
 
 class QuestionnaireAnswers(CamelModel):
@@ -58,6 +64,11 @@ class QuestionnaireAnswers(CamelModel):
     activity_level: ActivityLevel | None = None
     fatigue_reported: bool | None = None
     previous_lower_limb_injury: bool | None = None
+    # Specific sport, for matching the exercise library (see
+    # exercises/database.py, exercises/ranking.py). None (or "other",
+    # which report_service.py treats the same as None) applies no sport
+    # filter, rather than excluding every exercise.
+    specific_sport: Sport | None = None
     # When True, exercise recommendations are withheld entirely (see
     # ExerciseRecommendations.gated_reason below) — an active injury is a
     # reason to see a clinician, not a reason to get a workout suggestion

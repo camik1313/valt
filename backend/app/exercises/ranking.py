@@ -23,17 +23,19 @@
 # exercise in the current database (see database.py) lists the full
 # jump/cut sport set and every competitive level — none of the source
 # programs' materials differentiated by sport or level at the individual
-# exercise level. So today, SPORT and COMPETITIVE_LEVEL filters pass
-# every exercise through unchanged; they're wired up and ready for when
-# the database gains exercises that actually vary along those axes, not
-# decorative dead code.
+# exercise level. SPORT does have real teeth today: an athlete whose
+# specific sport isn't in that set (report_service.py maps "other" to
+# None rather than filtering on it) would otherwise see every exercise
+# excluded, so it's a genuine filter, just one that currently never
+# excludes anything for a sport the app actually tracks. COMPETITIVE_LEVEL
+# is still a no-op either way — every exercise matches every level — kept
+# wired for when the database gains entries that differentiate by level.
 #
 # DOMINANT LEG is accepted as a parameter for the same forward-looking
-# reason but currently unused: no exercise in the database has a
-# dominant-leg-specific variant, and the athlete intake doesn't even
-# collect dominant leg yet (see the pending "Quick Athlete Profile"
-# rework). Using it today would mean pretending to rank on data that
-# doesn't exist.
+# reason but currently unused, and not yet collected anywhere in the
+# athlete intake either: no exercise in the database has a
+# dominant-leg-specific variant, so there's nothing to rank on yet. Using
+# it today would mean pretending to rank on data that doesn't exist.
 # ============================================================
 
 from dataclasses import dataclass

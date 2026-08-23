@@ -206,6 +206,21 @@ def _activity_level_to_competitive_level(activity_level: str | None) -> str | No
     }.get(activity_level or "")
 
 
+def _specific_sport_to_ranking_sport(specific_sport: str | None) -> str | None:
+    """
+    Pass the questionnaire's specific_sport straight through to the
+    ranking call as a hard filter — UNLESS it's "other", which maps to
+    None (no filter). No exercise in the database lists "other" as a
+    sport (see database.py's JUMP_CUT_SPORTS), so filtering on it
+    literally would silently zero out every recommendation. None means
+    "don't filter on sport," which is the honest behavior when the
+    athlete's sport isn't one of the specific ones this app tracks.
+    """
+    if specific_sport is None or specific_sport == "other":
+        return None
+    return specific_sport
+
+
 def _build_recommendations(
     less_result: less_scoring.LessResult | None,
     metrics_list: list[Metric],
@@ -217,12 +232,6 @@ def _build_recommendations(
     library (exercises/ranking.py). Returns None — not computed — when
     there's no questionnaire to rank against, since age lives there and
     there's no honest default for it.
-
-    sport is deliberately never passed to the ranking call: the existing
-    questionnaire's sport_type is a coarse bucket (pivoting/cutting,
-    field/court, endurance) not one of the exercise database's specific
-    sports (soccer, basketball, ...), and there's no honest way to guess
-    which specific sport from that bucket.
     """
     if questionnaire is None:
         return None
@@ -247,6 +256,7 @@ def _build_recommendations(
     ranked = exercise_ranking.rank_exercises(
         detected,
         age_range=_age_to_range(questionnaire.age),
+        sport=_specific_sport_to_ranking_sport(questionnaire.specific_sport),
         competitive_level=_activity_level_to_competitive_level(questionnaire.activity_level),
     )
 

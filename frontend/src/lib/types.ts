@@ -56,6 +56,21 @@ export type QuestionnaireAnswers = {
   // ExerciseRecommendations.gatedReason below) — an active injury is a
   // reason to see a clinician, not a reason to get a workout suggestion.
   currentPainOrInjury?: boolean | null;
+  // Specific sport, for matching the exercise library (see
+  // backend/app/exercises/database.py's Sport type) — deliberately a
+  // separate, more specific field from sportType above, which is a
+  // coarse epidemiological bucket used only for the reported-factors
+  // citation. "other" (or leaving this unset) applies no sport filter
+  // when ranking exercises, rather than excluding every exercise.
+  specificSport?:
+    | "soccer"
+    | "basketball"
+    | "volleyball"
+    | "lacrosse"
+    | "field_hockey"
+    | "track_field"
+    | "other"
+    | null;
 };
 
 // One self-reported factor the literature associates with elevated ACL
