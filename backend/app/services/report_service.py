@@ -188,24 +188,6 @@ def _age_to_range(age: int | None) -> str:
     return "12-13"
 
 
-def _activity_level_to_competitive_level(activity_level: str | None) -> str | None:
-    """
-    Best-effort mapping from the existing screening questionnaire's
-    activity_level to the exercise database's CompetitiveLevel. Returns
-    None (no filter) for values with no honest equivalent (e.g.
-    "sedentary") rather than guessing one. Every exercise in the current
-    database lists every competitive level anyway (see
-    exercises/ranking.py's module docstring), so this mapping doesn't
-    change today's output — it's here so it's already correct once the
-    database gains exercises that differentiate by level.
-    """
-    return {
-        "recreational": "recreational",
-        "competitive_high_school": "high_school",
-        "competitive_college_or_pro": "college",
-    }.get(activity_level or "")
-
-
 def _specific_sport_to_ranking_sport(specific_sport: str | None) -> str | None:
     """
     Pass the questionnaire's specific_sport straight through to the
@@ -257,7 +239,8 @@ def _build_recommendations(
         detected,
         age_range=_age_to_range(questionnaire.age),
         sport=_specific_sport_to_ranking_sport(questionnaire.specific_sport),
-        competitive_level=_activity_level_to_competitive_level(questionnaire.activity_level),
+        competitive_level=questionnaire.competitive_level,
+        dominant_leg=questionnaire.dominant_leg,
     )
 
     return ExerciseRecommendations(

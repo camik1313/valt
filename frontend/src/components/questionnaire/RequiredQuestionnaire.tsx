@@ -38,8 +38,10 @@ export function isQuestionnaireComplete(a: RequiredAnswers): boolean {
     !!a.sex &&
     !!a.sportType &&
     !!a.specificSport &&
+    !!a.dominantLeg &&
     a.age !== undefined && a.age !== null && a.age > 0 &&
     !!a.activityLevel &&
+    !!a.competitiveLevel &&
     a.fatigueReported !== undefined && a.fatigueReported !== null &&
     a.previousLowerLimbInjury !== undefined && a.previousLowerLimbInjury !== null &&
     a.currentPainOrInjury !== undefined && a.currentPainOrInjury !== null &&
@@ -119,6 +121,24 @@ export default function RequiredQuestionnaire({ value, onChange }: Props) {
       </label>
 
       <label className="block text-sm font-medium text-ink">
+        Dominant leg (the one you&apos;d naturally jump off or plant with)
+        <span className="text-risk">*</span>
+        <select
+          className={selectClass}
+          value={value.dominantLeg ?? ""}
+          onChange={(e) => set("dominantLeg", e.target.value as QuestionnaireAnswers["dominantLeg"])}
+        >
+          <option value="" disabled>Choose one</option>
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+        </select>
+        <span className="mt-1 block text-[11px] font-normal text-muted">
+          Collected for exercise matching. No exercise in the library varies by dominant
+          leg yet, so this doesn&apos;t change today&apos;s recommendations.
+        </span>
+      </label>
+
+      <label className="block text-sm font-medium text-ink">
         Age <span className="text-risk">*</span>
         <input
           type="number"
@@ -144,6 +164,28 @@ export default function RequiredQuestionnaire({ value, onChange }: Props) {
           <option value="competitive_high_school">Competitive, high school</option>
           <option value="competitive_college_or_pro">Competitive, college or pro</option>
         </select>
+      </label>
+
+      <label className="block text-sm font-medium text-ink">
+        Competitive level, for exercise matching <span className="text-risk">*</span>
+        <select
+          className={selectClass}
+          value={value.competitiveLevel ?? ""}
+          onChange={(e) => set("competitiveLevel", e.target.value as QuestionnaireAnswers["competitiveLevel"])}
+        >
+          <option value="" disabled>Choose one</option>
+          <option value="recreational">Recreational</option>
+          <option value="club">Club</option>
+          <option value="high_school">High school</option>
+          <option value="college">College</option>
+          <option value="elite_academy">Elite academy</option>
+          <option value="other">Other</option>
+        </select>
+        <span className="mt-1 block text-[11px] font-normal text-muted">
+          Separate from the activity level above — this one is collected for exercise
+          matching, not the risk-factor context. Every exercise in the library currently
+          fits every level, so this doesn&apos;t change today&apos;s recommendations either.
+        </span>
       </label>
 
       <YesNoField

@@ -71,6 +71,21 @@ export type QuestionnaireAnswers = {
     | "track_field"
     | "other"
     | null;
+  // Competitive level and dominant leg, also for exercise matching (see
+  // backend/app/exercises/ranking.py). HONEST LIMITATION: every exercise
+  // in the current database lists every competitive level, and none has
+  // a dominant-leg-specific variant, so neither field changes which
+  // exercises are recommended today — collected now so ranking is
+  // already correct once the library grows entries that vary by them.
+  competitiveLevel?:
+    | "recreational"
+    | "club"
+    | "high_school"
+    | "college"
+    | "elite_academy"
+    | "other"
+    | null;
+  dominantLeg?: "left" | "right" | null;
 };
 
 // One self-reported factor the literature associates with elevated ACL

@@ -31,11 +31,13 @@
 # is still a no-op either way — every exercise matches every level — kept
 # wired for when the database gains entries that differentiate by level.
 #
-# DOMINANT LEG is accepted as a parameter for the same forward-looking
-# reason but currently unused, and not yet collected anywhere in the
-# athlete intake either: no exercise in the database has a
-# dominant-leg-specific variant, so there's nothing to rank on yet. Using
-# it today would mean pretending to rank on data that doesn't exist.
+# DOMINANT LEG is collected by the intake (see
+# QuestionnaireAnswers.dominant_leg) and passed through to this function,
+# but is not yet used for anything: no exercise in the database has a
+# dominant-leg-specific variant, so there's nothing to rank on yet. It's
+# accepted (and immediately discarded below) rather than silently ranking
+# on data that doesn't exist — pretending it changed the result would be
+# worse than not collecting it at all.
 # ============================================================
 
 from dataclasses import dataclass

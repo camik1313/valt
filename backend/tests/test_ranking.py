@@ -51,6 +51,28 @@ def test_sport_filter_has_real_teeth():
     assert results_soccer
 
 
+def test_dominant_leg_does_not_affect_results_yet():
+    """No exercise in the current database has a dominant-leg-specific
+    variant (see ranking.py's module docstring), so passing dominant_leg
+    should be a pure no-op today. If this test ever fails, it means an
+    exercise started varying by leg and this test needs updating
+    alongside it — not that the no-op silently changed."""
+    priorities = [_priority("frontal_knee_control", 1.0)]
+    without_leg = rank_exercises(priorities, age_range="18+", top_n=50)
+    with_leg = rank_exercises(priorities, age_range="18+", dominant_leg="left", top_n=50)
+    assert [r.exercise.exercise_id for r in without_leg] == [r.exercise.exercise_id for r in with_leg]
+
+
+def test_competitive_level_filter_is_currently_a_no_op():
+    """Every exercise in the current database lists every competitive
+    level, so this filter shouldn't exclude anything today — see
+    ranking.py's module docstring."""
+    priorities = [_priority("frontal_knee_control", 1.0)]
+    unfiltered = rank_exercises(priorities, age_range="18+", top_n=50)
+    filtered = rank_exercises(priorities, age_range="18+", competitive_level="club", top_n=50)
+    assert [r.exercise.exercise_id for r in unfiltered] == [r.exercise.exercise_id for r in filtered]
+
+
 def test_score_sums_severity_across_all_matched_priorities():
     """squat_jump_stick targets landing_control, frontal_knee_control, and
     knee_flexion. Flagging all three should score it higher than flagging

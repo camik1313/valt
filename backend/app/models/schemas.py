@@ -54,6 +54,12 @@ ActivityLevel = Literal["sedentary", "recreational", "competitive_high_school", 
 # only for the reported-factor citation; this one names an actual sport
 # so it can be used as a real filter when matching the exercise library.
 Sport = Literal["soccer", "basketball", "volleyball", "lacrosse", "field_hockey", "track_field", "other"]
+# The exercise database's own competitive-level taxonomy (see
+# exercises/database.py's CompetitiveLevel type) — deliberately separate
+# from activity_level above, which is a coarser epidemiological bucket
+# used only for the reported-factor citation.
+CompetitiveLevel = Literal["recreational", "club", "high_school", "college", "elite_academy", "other"]
+DominantLeg = Literal["left", "right"]
 
 
 class QuestionnaireAnswers(CamelModel):
@@ -69,6 +75,14 @@ class QuestionnaireAnswers(CamelModel):
     # which report_service.py treats the same as None) applies no sport
     # filter, rather than excluding every exercise.
     specific_sport: Sport | None = None
+    # Competitive level and dominant leg, also for exercise matching (see
+    # exercises/ranking.py). HONEST LIMITATION: every exercise in the
+    # current database lists every competitive level, and none has a
+    # dominant-leg-specific variant, so neither field changes which
+    # exercises are recommended today — they're collected now so ranking
+    # is already correct once the library grows entries that vary by them.
+    competitive_level: CompetitiveLevel | None = None
+    dominant_leg: DominantLeg | None = None
     # When True, exercise recommendations are withheld entirely (see
     # ExerciseRecommendations.gated_reason below) — an active injury is a
     # reason to see a clinician, not a reason to get a workout suggestion

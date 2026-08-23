@@ -319,6 +319,31 @@ def test_recommendations_not_zeroed_out_when_sport_is_other():
     assert analysis.recommendations.exercises
 
 
+def test_recommendations_computed_with_competitive_level_and_dominant_leg():
+    """Both fields are wired straight through to rank_exercises today
+    without changing output (every exercise matches every competitive
+    level, and no exercise varies by dominant leg — see
+    exercises/ranking.py's module docstring). This just proves the wiring
+    doesn't break anything end to end, from questionnaire to ranked list."""
+    questionnaire = QuestionnaireAnswers(
+        age=16, current_pain_or_injury=False,
+        competitive_level="club", dominant_leg="left",
+    )
+    with patch("app.services.report_service.pipeline.run_pipeline", return_value=_fake_front_view_result()):
+        analysis = report_service.build_analysis(
+            upload_id="test123",
+            athlete_name="Test Athlete",
+            video_filename="jump.mp4",
+            video_path="/fake/path.mp4",
+            view="front",
+            questionnaire=questionnaire,
+        )
+
+    assert analysis.recommendations is not None
+    assert analysis.recommendations.gated_reason is None
+    assert analysis.recommendations.exercises
+
+
 def test_recommendations_gated_when_current_pain_or_injury_reported():
     questionnaire = QuestionnaireAnswers(age=16, current_pain_or_injury=True)
     with patch("app.services.report_service.pipeline.run_pipeline", return_value=_fake_front_view_result()):
