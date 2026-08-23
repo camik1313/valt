@@ -322,3 +322,33 @@ def test_recommendations_none_without_a_questionnaire():
         )
 
     assert analysis.recommendations is None
+
+
+# ---- Landing profile ----
+
+def test_landing_profile_populated_with_four_categories_no_questionnaire_needed():
+    # Unlike recommendations, landing_profile needs no questionnaire —
+    # just real measurements.
+    with patch("app.services.report_service.pipeline.run_pipeline", return_value=_fake_front_view_result()):
+        analysis = report_service.build_analysis(
+            upload_id="test123",
+            athlete_name="Test Athlete",
+            video_filename="jump.mp4",
+            video_path="/fake/path.mp4",
+            view="front",
+        )
+
+    assert analysis.landing_profile is not None
+    assert len(analysis.landing_profile.categories) == 4
+    knee_control = next(c for c in analysis.landing_profile.categories if c.category == "knee_control")
+    assert knee_control.rating == "watch"  # knee_valgus_left=0.20 lands in the watch band
+
+
+def test_landing_profile_none_on_mock_fallback():
+    analysis = report_service.build_analysis(
+        upload_id="test123",
+        athlete_name="Test Athlete",
+        video_filename="jump.mp4",
+        video_path=None,
+    )
+    assert analysis.landing_profile is None

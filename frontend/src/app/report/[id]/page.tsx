@@ -20,6 +20,7 @@ import RiskScoreCard from "@/components/risk/RiskScoreCard";
 import LessScoreCard from "@/components/risk/LessScoreCard";
 import ProtocolCheckCard from "@/components/risk/ProtocolCheckCard";
 import RecommendedExercisesCard from "@/components/exercises/RecommendedExercisesCard";
+import LandingProfileCard from "@/components/report/LandingProfileCard";
 import Button from "@/components/ui/Button";
 
 export default function ReportPage({ params }: { params: { id: string } }) {
@@ -98,6 +99,13 @@ export default function ReportPage({ params }: { params: { id: string } }) {
         <p className="mt-2 whitespace-pre-line leading-relaxed text-ink">{analysis.summary}</p>
       </div>
 
+      {/* Simple summary, before any raw numbers */}
+      {analysis.landingProfile && (
+        <div className="mt-8">
+          <LandingProfileCard profile={analysis.landingProfile} />
+        </div>
+      )}
+
       {/* Chart */}
       <div className="mt-8">
         <h2 className="mb-3 font-display text-lg font-semibold text-ink">Measurements at landing</h2>
@@ -143,8 +151,9 @@ export default function ReportPage({ params }: { params: { id: string } }) {
         </p>
       </div>
 
-      <div className="mt-6 flex gap-3">
+      <div className="mt-6 flex flex-wrap gap-3">
         <Button href="/capture" variant="primary">Record another</Button>
+        <Button href={`/compare?a=${analysis.id}`} variant="outline">Compare with another landing</Button>
         <Button href="/history" variant="outline">View history</Button>
       </div>
     </section>

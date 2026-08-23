@@ -14,6 +14,8 @@ from app.models.schemas import (
     Analysis,
     ContributingFactor,
     ExerciseRecommendations,
+    LandingProfile,
+    LandingProfileCategory,
     LessItemScore,
     LessQuestionnaireAnswers,
     LessScore,
@@ -31,6 +33,7 @@ from app.risk import scoring as risk_scoring
 from app.risk import less as less_scoring
 from app.exercises import priorities as exercise_priorities
 from app.exercises import ranking as exercise_ranking
+from app.reports import landing_profile as landing_profile_service
 
 # Shown on every computed set of exercise recommendations — general
 # conditioning suggestions matched to what this scan flagged, not a
@@ -305,6 +308,21 @@ def _build_recommendations(
             for r in ranked
         ],
         disclaimer=EXERCISE_DISCLAIMER,
+    )
+
+
+def _to_landing_profile_schema(result: landing_profile_service.LandingProfile) -> LandingProfile:
+    """Convert reports/landing_profile.py's plain-dataclass result into
+    the Pydantic schema that goes out over the wire."""
+    return LandingProfile(
+        categories=[
+            LandingProfileCategory(
+                category=c.category, label=c.label, rating=c.rating,
+                value=c.value, unit=c.unit, metric_label=c.metric_label,
+                explanation=c.explanation, source_view=c.source_view,
+            )
+            for c in result.categories
+        ]
     )
 
 
@@ -601,22 +619,31 @@ def build_analysis(
     if not used_mock and protocol_check_result is not None:
         protocol_check_schema = _to_protocol_check_schema(protocol_check_result)
 
-    # ---- 7) Exercise recommendations (from this scan's movement priorities) ----
+    # ---- 7) Landing profile (the simple, always-four-category summary) ----
+    # Doesn't need a questionnaire — only real measurements — so it's
+    # computed whenever the pipeline ran for real, same condition as the
+    # LESS score above.
+    landing_profile_schema = None
+    if not used_mock:
+        profile = landing_profile_service.compute_landing_profile(metrics_list, less_result.items if less_result else [])
+        landing_profile_schema = _to_landing_profile_schema(profile)
+
+    # ---- 8) Exercise recommendations (from this scan's movement priorities) ----
     recommendations_schema = None
     if not used_mock:
         recommendations_schema = _build_recommendations(less_result, metrics_list, questionnaire)
 
-    # ---- 8) Summary ----
+    # ---- 9) Summary ----
     view_label = "+".join(views_used)
     summary = _build_summary(athlete_name, used_mock, fallback_reason, metrics_list, less_result, notes)
 
-    # ---- 9) Delete both videos now that every measurement has been
+    # ---- 10) Delete both videos now that every measurement has been
     # extracted — nothing past this point needs the raw footage. Covers
     # the side clip whether it succeeded or failed above.
     storage.delete_video(video_path)
     storage.delete_video(side_video_path)
 
-    # ---- 10) Assemble ----
+    # ---- 11) Assemble ----
     combined_filename = video_filename
     if side_video_filename:
         combined_filename = f"{video_filename} + {side_video_filename}"
@@ -633,4 +660,5 @@ def build_analysis(
         less_score=less_score_schema,
         protocol_check=protocol_check_schema,
         recommendations=recommendations_schema,
+        landing_profile=landing_profile_schema,
     )

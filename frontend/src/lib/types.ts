@@ -196,6 +196,28 @@ export type ExerciseRecommendations = {
   disclaimer: string;
 };
 
+// ============================================================
+// LANDING PROFILE — mirrors backend/app/reports/landing_profile.py.
+// The simple, ALWAYS four-category summary (Knee control, Landing
+// depth, Symmetry, Trunk control) shown before the technical LESS/
+// metric breakdown, and what the Compare page diffs between two scans.
+// ============================================================
+
+export type LandingProfileCategory = {
+  category: string;          // e.g. "knee_control"
+  label: string;               // e.g. "Knee control"
+  rating: "ok" | "watch" | "flag" | "unavailable";
+  value: number | null;
+  unit: string | null;
+  metricLabel: string | null;
+  explanation: string;
+  sourceView: "front" | "side" | null;
+};
+
+export type LandingProfile = {
+  categories: LandingProfileCategory[];
+};
+
 // A single completed analysis of one video.
 export type Analysis = {
   id: string;
@@ -220,6 +242,9 @@ export type Analysis = {
   // age to bucket by) — distinct from a computed result with an empty
   // exercise list.
   recommendations: ExerciseRecommendations | null;
+  // The simple four-category summary. null only on mock fallback — no
+  // questionnaire required, unlike recommendations.
+  landingProfile: LandingProfile | null;
 };
 
 // The status the upload screen moves through.

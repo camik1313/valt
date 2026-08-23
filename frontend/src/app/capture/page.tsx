@@ -486,6 +486,15 @@ export default function CapturePage() {
         [STANDING_SECONDS, STANDING_SECONDS + BOX_STEP_SECONDS]
       );
 
+      // Remembered for the Compare page's convenience default ("compare
+      // with your last attempt") — session-only, cleared when the tab
+      // closes, not a persistent history the athlete didn't ask for.
+      try {
+        sessionStorage.setItem("valt:lastAnalysisId", analysis.id);
+      } catch {
+        /* sessionStorage unavailable (private browsing, etc.) — not fatal */
+      }
+
       // A second clip was submitted but didn't make it into the result
       // (analysis.view would be e.g. "front+side" if both had; just
       // "front" means the side clip couldn't be analyzed server-side —

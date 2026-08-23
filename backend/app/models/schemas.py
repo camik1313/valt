@@ -201,6 +201,28 @@ class ExerciseRecommendations(CamelModel):
     disclaimer: str
 
 
+# ============================================================
+# LANDING PROFILE — see backend/app/reports/landing_profile.py. The
+# simple, always-four-categories summary shown before the technical
+# LESS/metric breakdown, and what Compare (below) diffs between two
+# analyses.
+# ============================================================
+
+class LandingProfileCategory(CamelModel):
+    category: str            # e.g. "knee_control"
+    label: str                 # e.g. "Knee control"
+    rating: Literal["ok", "watch", "flag", "unavailable"]
+    value: float | None = None
+    unit: str | None = None
+    metric_label: str | None = None
+    explanation: str
+    source_view: str | None = None
+
+
+class LandingProfile(CamelModel):
+    categories: list[LandingProfileCategory]
+
+
 # ---- A complete analysis of one video ----
 class Analysis(CamelModel):
     id: str
@@ -226,6 +248,11 @@ class Analysis(CamelModel):
     # fallback, or no questionnaire submitted) — distinct from a real,
     # computed ExerciseRecommendations with an empty exercise list.
     recommendations: ExerciseRecommendations | None = None
+    # The simple, always-four-category summary (see LandingProfile above).
+    # None only on mock fallback — unlike recommendations, this doesn't
+    # need a questionnaire, so it's computed whenever real measurements
+    # exist.
+    landing_profile: LandingProfile | None = None
 
 
 # ---- Response after uploading a video ----
