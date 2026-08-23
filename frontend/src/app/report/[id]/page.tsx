@@ -16,7 +16,7 @@ import { Analysis } from "@/lib/types";
 import { getReport } from "@/lib/api";
 import MetricCard from "@/components/report/MetricCard";
 import ReportChart from "@/components/report/ReportChart";
-import RiskScoreCard from "@/components/risk/RiskScoreCard";
+import ReportedFactorsCard from "@/components/risk/ReportedFactorsCard";
 import LessScoreCard from "@/components/risk/LessScoreCard";
 import ProtocolCheckCard from "@/components/risk/ProtocolCheckCard";
 import RecommendedExercisesCard from "@/components/exercises/RecommendedExercisesCard";
@@ -131,9 +131,9 @@ export default function ReportPage({ params }: { params: { id: string } }) {
         <LessScoreCard lessScore={analysis.lessScore} />
       </div>
 
-      {/* Epidemiological risk-factor screening (separate from LESS) */}
+      {/* Self-reported epidemiological risk factors (separate from LESS) */}
       <div className="mt-8">
-        <RiskScoreCard riskScore={analysis.riskScore} />
+        <ReportedFactorsCard factors={analysis.reportedFactors} />
       </div>
 
       {/* Personalized exercise recommendations from this scan's priorities */}

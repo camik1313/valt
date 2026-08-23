@@ -1,7 +1,7 @@
 # ============================================================
-# test_report_service.py — proves build_analysis wires the screening
-# risk score together correctly: populated when the real pipeline runs,
-# absent on a mock fallback, and questionnaire-optional either way.
+# test_report_service.py — proves build_analysis wires everything
+# together correctly: self-reported risk factors, LESS score, exercise
+# recommendations, and video cleanup.
 #
 # We monkeypatch app.cv.pipeline.run_pipeline so these tests don't need
 # a real video file — same technique the pipeline itself is decoupled
@@ -33,7 +33,7 @@ def _fake_front_view_result() -> PipelineResult:
     )
 
 
-def test_risk_score_populated_when_real_pipeline_succeeds():
+def test_reported_factors_empty_without_questionnaire():
     with patch("app.services.report_service.pipeline.run_pipeline", return_value=_fake_front_view_result()):
         analysis = report_service.build_analysis(
             upload_id="test123",
@@ -43,29 +43,25 @@ def test_risk_score_populated_when_real_pipeline_succeeds():
             view="front",
         )
 
-    assert analysis.risk_score is not None
-    assert analysis.risk_score.questionnaire is None
-    # Only knee_valgus_left (0.20 >= 0.15) triggers -> 2.0 of the front-view
-    # biomechanical max of 7.0 (2 + 2 + 1.5 + 1.5).
-    assert analysis.risk_score.biomechanical.points == 2.0
-    assert analysis.risk_score.biomechanical.max_points == 7.0
-    assert analysis.risk_score.total_points == 2.0
-    assert "not a diagnosis" in analysis.risk_score.disclaimer.lower()
+    assert analysis.reported_factors == []
 
 
-def test_risk_score_none_on_mock_fallback():
-    # No video_path -> report_service falls back to the mock pipeline,
-    # which has no real biomechanics, so no risk score should be fabricated.
+def test_reported_factors_computed_on_mock_fallback_when_questionnaire_given():
+    # Reported factors come entirely from self-report, not measurements,
+    # so unlike the LESS/recommendations sections they're still computed
+    # even when the real pipeline didn't run.
+    questionnaire = QuestionnaireAnswers(previous_acl_injury=True)
     analysis = report_service.build_analysis(
         upload_id="test123",
         athlete_name="Test Athlete",
         video_filename="jump.mp4",
         video_path=None,
+        questionnaire=questionnaire,
     )
-    assert analysis.risk_score is None
+    assert any(f.key == "previous_acl_injury" for f in analysis.reported_factors)
 
 
-def test_risk_score_includes_questionnaire_when_provided():
+def test_reported_factors_include_matching_questionnaire_answers():
     questionnaire = QuestionnaireAnswers(previous_acl_injury=True)
     with patch("app.services.report_service.pipeline.run_pipeline", return_value=_fake_front_view_result()):
         analysis = report_service.build_analysis(
@@ -77,10 +73,11 @@ def test_risk_score_includes_questionnaire_when_provided():
             questionnaire=questionnaire,
         )
 
-    assert analysis.risk_score is not None
-    assert analysis.risk_score.questionnaire is not None
-    assert analysis.risk_score.questionnaire.points == 4.0
-    assert analysis.risk_score.total_points == 2.0 + 4.0
+    keys = {f.key for f in analysis.reported_factors}
+    assert keys == {"previous_acl_injury"}
+    factor = analysis.reported_factors[0]
+    assert "previous acl injury" in factor.detail.lower()
+    assert factor.citation
 
 
 # ---- Combined front+side session (same-session second clip) ----
@@ -100,7 +97,7 @@ def _fake_side_view_result() -> PipelineResult:
     )
 
 
-def test_combined_clip_merges_measurements_and_widens_risk_score():
+def test_combined_clip_merges_measurements_from_both_views():
     def side_effect(seed, video_path, view, **_kwargs):
         return _fake_side_view_result() if view == "side" else _fake_front_view_result()
 
@@ -120,12 +117,6 @@ def test_combined_clip_merges_measurements_and_widens_risk_score():
 
     metric_keys = {m.key for m in analysis.metrics}
     assert {"knee_valgus_left", "knee_flexion_left"} <= metric_keys
-
-    # Biomechanical max should now cover BOTH planes: 7.0 (front) + 7.5 (side).
-    assert analysis.risk_score is not None
-    assert analysis.risk_score.biomechanical.max_points == 14.5
-    # knee_valgus_left (+2, front) and knee_flexion_left (+2, side) both trigger.
-    assert analysis.risk_score.biomechanical.points == 4.0
 
 
 def test_side_clip_failure_keeps_primary_clip_real_result():
@@ -148,8 +139,6 @@ def test_side_clip_failure_keeps_primary_clip_real_result():
     # A failed second clip degrades to front-only, NOT a full mock fallback —
     # the primary clip's real measurements are still used.
     assert analysis.view == "front"
-    assert analysis.risk_score is not None
-    assert analysis.risk_score.biomechanical.max_points == 7.0
     assert "couldn't be analyzed" in analysis.summary
 
 
@@ -201,7 +190,7 @@ def test_video_path_none_still_uses_mock_deliberately():
         video_filename="jump.mp4",
         video_path=None,
     )
-    assert analysis.risk_score is None
+    assert analysis.reported_factors == []
     assert "SIMULATED RESULT" in analysis.summary
 
 

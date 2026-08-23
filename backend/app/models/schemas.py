@@ -37,11 +37,11 @@ class Metric(CamelModel):
 
 
 # ============================================================
-# SCREENING RISK SCORE — see backend/app/risk/scoring.py for the full
-# explanation of what this is (and, just as important, what it is NOT:
-# not a diagnosis, not a trained model, not an injury probability, not
-# a reimplementation of the full LESS). These schemas just carry that
-# module's result shape over the wire; the scoring itself lives there.
+# SELF-REPORTED RISK FACTORS — see backend/app/risk/reported_factors.py
+# for the full explanation of what this is (and, just as important, what
+# it is NOT: not a score, no weights, no band, not a diagnosis, not a
+# predictor). These schemas just carry that module's result shape over
+# the wire; the logic itself lives there.
 # ============================================================
 
 # ---- Optional self-report questionnaire (every field optional) ----
@@ -65,33 +65,14 @@ class QuestionnaireAnswers(CamelModel):
     current_pain_or_injury: bool | None = None
 
 
-# ---- One factor that moved the screening score, in plain language ----
-class ContributingFactor(CamelModel):
+# ---- One self-reported factor the literature associates with elevated
+# ACL injury risk, in plain language, with its own citation. Unscored:
+# no points, no weight relative to the other factors in the list. ----
+class ReportedFactor(CamelModel):
     key: str
     label: str
-    points: float
     detail: str
-
-
-# ---- Subtotal for one half of the score (biomechanical or questionnaire) ----
-class PartialScore(CamelModel):
-    points: float
-    max_points: float
-    factors: list[ContributingFactor]
-
-
-# ---- The full screening result attached to an Analysis ----
-class RiskScore(CamelModel):
-    band: Literal["low", "moderate", "elevated"]
-    percent_of_max: float     # 0..100, percent of ACHIEVABLE points — not a probability
-    total_points: float
-    total_max_points: float
-    biomechanical: PartialScore
-    # None when no questionnaire was submitted — the frontend then shows
-    # the biomechanical portion only, per the product requirement.
-    questionnaire: PartialScore | None = None
-    factors: list[ContributingFactor]   # biomechanical + questionnaire, combined
-    disclaimer: str
+    citation: str
 
 
 # ============================================================
@@ -234,9 +215,12 @@ class Analysis(CamelModel):
     view: str = "front"
     metrics: list[Metric]
     summary: str             # plain-language overview
-    # None when the real pipeline didn't run (e.g. mock fallback) — there are
-    # no real measurements to screen in that case, so we don't fabricate one.
-    risk_score: RiskScore | None = None
+    # Self-reported epidemiological risk factors that matched a
+    # literature-associated category (see risk/reported_factors.py).
+    # Always a list, never null — empty when no questionnaire was given
+    # or nothing reported matched one; these come entirely from
+    # self-report, so there's nothing to withhold on a mock fallback.
+    reported_factors: list[ReportedFactor] = []
     # The real, cited LESS score (see risk/less.py). Also None on mock fallback.
     less_score: LessScore | None = None
     # Measured box-jump protocol fidelity. None when calibration wasn't

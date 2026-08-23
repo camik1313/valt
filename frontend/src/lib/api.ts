@@ -60,13 +60,13 @@ export async function uploadVideo(file: File): Promise<UploadResult> {
 }
 
 // ---- POST /analyze : run analysis on an uploaded video ----
-// `questionnaire` is optional — omit it to get a risk score covering the
-// biomechanical portion only (see RiskScore in types.ts).
+// `questionnaire` is optional — omit it to skip the self-reported risk
+// factors entirely (see ReportedFactor in types.ts).
 // `sideUploadId` is an optional SECOND clip from the same session, filmed
 // from the opposite angle (front primary -> side second, or vice versa).
 // When given, its measurements are merged with the primary clip's, so the
-// screening score AND the LESS score can see both frontal- and sagittal-
-// plane criteria instead of just one.
+// LESS score can see both frontal- and sagittal-plane criteria instead of
+// just one.
 // `lessQuestionnaire` answers the 3 LESS items no camera can score (foot
 // rotation x2, overall impression) — also optional.
 // `athleteHeightCm`, `groundWindowSeconds`, and `boxWindowSeconds` are only

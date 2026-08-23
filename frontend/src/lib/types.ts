@@ -22,13 +22,14 @@ export type Metric = {
 export type CameraView = "front" | "side";
 
 // ============================================================
-// SCREENING RISK SCORE — mirrors backend/app/risk/scoring.py and
-// backend/app/models/schemas.py. See scoring.py for the full "what this
-// is and isn't" explanation: NOT a diagnosis, NOT a trained model, NEVER
-// an injury probability. This is a small set of illustrative biomechanical
-// checks PLUS a real, cited epidemiological questionnaire (prior injury,
-// sex, sport, age, activity level, fatigue) — general risk-factor context
-// that sits alongside, but is not part of, the LESS score below.
+// SELF-REPORTED RISK FACTORS — mirrors backend/app/risk/reported_factors.py
+// and backend/app/models/schemas.py. See reported_factors.py for the full
+// "what this is and isn't" explanation: NOT a score (no points, no
+// weights, no band), NOT a diagnosis, NEVER an injury probability. A
+// real, cited epidemiological questionnaire (prior injury, sex, sport,
+// age, activity level, fatigue) surfaced as plain, unscored callouts —
+// general risk-factor context that sits alongside, but is not part of,
+// the LESS score below.
 // ============================================================
 
 // The optional self-report questionnaire. Every field is optional —
@@ -57,33 +58,14 @@ export type QuestionnaireAnswers = {
   currentPainOrInjury?: boolean | null;
 };
 
-// One factor that moved the screening score, in plain language.
-export type ContributingFactor = {
+// One self-reported factor the literature associates with elevated ACL
+// injury risk, in plain language, with its own citation. Unscored: no
+// points, no weight relative to the other factors in the list.
+export type ReportedFactor = {
   key: string;
   label: string;
-  points: number;
   detail: string;
-};
-
-// Subtotal for one half of the score (biomechanical or questionnaire).
-export type PartialScore = {
-  points: number;
-  maxPoints: number;
-  factors: ContributingFactor[];
-};
-
-// The full screening result attached to an Analysis.
-export type RiskScore = {
-  band: "low" | "moderate" | "elevated";
-  percentOfMax: number;      // 0..100, percent of ACHIEVABLE points — not a probability
-  totalPoints: number;
-  totalMaxPoints: number;
-  biomechanical: PartialScore;
-  // null when no questionnaire was submitted — show the biomechanical
-  // portion only in that case.
-  questionnaire: PartialScore | null;
-  factors: ContributingFactor[];   // biomechanical + questionnaire, combined
-  disclaimer: string;
+  citation: string;
 };
 
 // ============================================================
@@ -229,9 +211,10 @@ export type Analysis = {
   view: string;
   metrics: Metric[];
   summary: string;        // plain-language overview
-  // null when the real pipeline didn't run (e.g. mock fallback) — there
-  // are no real measurements to screen in that case.
-  riskScore: RiskScore | null;
+  // Self-reported epidemiological risk factors that matched a
+  // literature-associated category. Always an array, never null — empty
+  // when no questionnaire was given or nothing reported matched one.
+  reportedFactors: ReportedFactor[];
   // The real, cited LESS score. Also null on mock fallback.
   lessScore: LessScore | null;
   // Measured box-jump protocol fidelity. null when calibration wasn't

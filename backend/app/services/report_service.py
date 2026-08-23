@@ -12,7 +12,6 @@
 
 from app.models.schemas import (
     Analysis,
-    ContributingFactor,
     ExerciseRecommendations,
     LandingProfile,
     LandingProfileCategory,
@@ -21,15 +20,14 @@ from app.models.schemas import (
     LessScore,
     Metric,
     MovementPriority,
-    PartialScore,
     ProtocolCheck,
     QuestionnaireAnswers,
     RecommendedExercise,
-    RiskScore,
+    ReportedFactor,
 )
 from app.services import storage
 from app.cv import calibration, pipeline, mock_pipeline
-from app.risk import scoring as risk_scoring
+from app.risk import reported_factors as reported_factors_service
 from app.risk import less as less_scoring
 from app.exercises import priorities as exercise_priorities
 from app.exercises import ranking as exercise_ranking
@@ -97,14 +95,14 @@ THRESHOLDS = {
 }
 
 
-def _to_scoring_answers(
+def _to_reported_factors_answers(
     questionnaire: QuestionnaireAnswers | None,
-) -> risk_scoring.QuestionnaireAnswers | None:
+) -> reported_factors_service.QuestionnaireAnswers | None:
     """Convert the wire-facing (Pydantic) questionnaire into the plain
-    dataclass risk/scoring.py works with, so scoring stays framework-free."""
+    dataclass risk/reported_factors.py works with, so it stays framework-free."""
     if questionnaire is None:
         return None
-    return risk_scoring.QuestionnaireAnswers(
+    return reported_factors_service.QuestionnaireAnswers(
         previous_acl_injury=questionnaire.previous_acl_injury,
         sex=questionnaire.sex,
         sport_type=questionnaire.sport_type,
@@ -115,38 +113,15 @@ def _to_scoring_answers(
     )
 
 
-def _to_risk_score_schema(result: risk_scoring.ScreeningResult) -> RiskScore:
-    """Convert risk/scoring.py's plain-dataclass result into the Pydantic
-    schema that goes out over the wire (camelCase, via CamelModel)."""
-
-    def factors(fs: list[risk_scoring.ContributingFactor]) -> list[ContributingFactor]:
-        return [
-            ContributingFactor(key=f.key, label=f.label, points=f.points, detail=f.detail)
-            for f in fs
-        ]
-
-    questionnaire_score = None
-    if result.questionnaire is not None:
-        questionnaire_score = PartialScore(
-            points=result.questionnaire.points,
-            max_points=result.questionnaire.max_points,
-            factors=factors(result.questionnaire.factors),
-        )
-
-    return RiskScore(
-        band=result.band,
-        percent_of_max=result.percent_of_max,
-        total_points=result.total_points,
-        total_max_points=result.total_max_points,
-        biomechanical=PartialScore(
-            points=result.biomechanical.points,
-            max_points=result.biomechanical.max_points,
-            factors=factors(result.biomechanical.factors),
-        ),
-        questionnaire=questionnaire_score,
-        factors=factors(result.factors),
-        disclaimer=result.disclaimer,
-    )
+def _to_reported_factors_schema(
+    factors: list[reported_factors_service.ReportedFactor],
+) -> list[ReportedFactor]:
+    """Convert risk/reported_factors.py's plain-dataclass results into the
+    Pydantic schema that goes out over the wire (camelCase, via CamelModel)."""
+    return [
+        ReportedFactor(key=f.key, label=f.label, detail=f.detail, citation=f.citation)
+        for f in factors
+    ]
 
 
 def _to_less_questionnaire_answers(
@@ -590,16 +565,15 @@ def build_analysis(
             Metric(key=key, label=label, value=value, unit=unit, status=_band(key, value))
         )
 
-    # ---- 4) Screening risk score (epidemiological + illustrative subset) ----
-    # Only computed when the real pipeline actually produced measurements.
-    # A mock fallback has no real biomechanics to screen, so we don't
-    # fabricate a score off placeholder numbers — see risk/scoring.py.
-    risk_score = None
-    if not used_mock:
-        screening = risk_scoring.compute_screening_score(
-            measurements, _to_scoring_answers(questionnaire)
+    # ---- 4) Self-reported risk factors (epidemiological, unscored) ----
+    # These come entirely from the questionnaire, not from measurements,
+    # so unlike the sections below they're computed even on a mock
+    # fallback — see risk/reported_factors.py.
+    reported_factors_schema = _to_reported_factors_schema(
+        reported_factors_service.reported_risk_factors(
+            _to_reported_factors_answers(questionnaire)
         )
-        risk_score = _to_risk_score_schema(screening)
+    )
 
     # ---- 5) LESS score (the real, cited 17-item assessment) ----
     # See risk/less.py. Uses less_raw (initial-contact + max-flexion frame
@@ -656,7 +630,7 @@ def build_analysis(
         view=view_label,
         metrics=metrics_list,
         summary=summary,
-        risk_score=risk_score,
+        reported_factors=reported_factors_schema,
         less_score=less_score_schema,
         protocol_check=protocol_check_schema,
         recommendations=recommendations_schema,

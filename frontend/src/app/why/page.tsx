@@ -320,12 +320,11 @@ export default function WhyPage() {
             </li>
           </ol>
           <p className="mt-6 text-xs leading-relaxed text-muted">
-            The remaining screening-score criteria used elsewhere in this app (age, sex,
-            sport type, fatigue, prior injury, and the illustrative biomechanical
-            thresholds, see the report page&apos;s &ldquo;Risk factor screening&rdquo;
-            section) cite additional sources not independently re-verified for this page;
-            see{" "}
-            <code className="rounded bg-surface px-1 py-0.5">backend/app/risk/scoring.py</code>{" "}
+            The remaining self-reported risk factors used elsewhere in this app (age, sex,
+            sport type, fatigue, prior injury — see the report page&apos;s
+            &ldquo;Self-reported risk factors&rdquo; section) cite additional sources not
+            independently re-verified for this page; see{" "}
+            <code className="rounded bg-surface px-1 py-0.5">backend/app/risk/reported_factors.py</code>{" "}
             for that list.
           </p>
         </div>
