@@ -1,14 +1,12 @@
 // ============================================================
 // Hero.tsx — the first thing visitors see.
-// The SIGNATURE element is on the right: an SVG "pose skeleton"
-// of an athlete in a jump-landing position, with landmark dots
-// that gently pulse — a preview of what the software detects.
-// The knee joints are drawn in the RISK color to hint at the
-// core measurement (dynamic knee valgus at landing).
+// The SIGNATURE element is on the right: a dark "instrument card"
+// with an SVG pose skeleton and live-looking readouts, styled after
+// a data-forward athletic product (WHOOP-style readout, not a soft
+// illustration) — this is a measurement instrument, not a doodle.
 // ============================================================
 
 import Button from "@/components/ui/Button";
-import { GradientBlob, Sparkle, DotCluster, Squiggle } from "@/components/decor/Doodles";
 
 export default function Hero() {
   return (
@@ -24,58 +22,36 @@ export default function Hero() {
         }}
       />
 
-      {/* Soft color-wash blobs, drifting slowly behind the content. */}
-      <GradientBlob
-        id="hero-blob-1"
-        from="bloom"
-        to="iris"
-        className="-left-24 -top-24 h-80 w-80 opacity-40 animate-drift"
-      />
-      <GradientBlob
-        id="hero-blob-2"
-        from="sprout"
-        to="track"
-        className="-right-16 top-10 h-72 w-72 opacity-30 animate-drift [animation-delay:-4s]"
-      />
-
       <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-6 py-20 md:grid-cols-2 md:py-28">
         {/* ---- Left: the message ---- */}
         <div className="relative">
-          {/* Whimsical accents scattered near the headline. */}
-          <Sparkle className="absolute -left-6 top-2 h-4 w-4 animate-wiggle" color="bloom" />
-          <Sparkle
-            className="absolute left-40 -top-3 h-3 w-3 animate-wiggle [animation-delay:-2s]"
-            color="sprout"
-          />
-          <DotCluster className="absolute -right-2 top-16 hidden h-6 w-9 md:block" color="iris" />
-
           <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-track">
             <span className="h-1.5 w-1.5 rounded-full bg-track" />
-            Biomechanics, from a smartphone video
+            Movement science for female athletes
           </span>
 
           <h1 className="mt-6 font-display text-4xl font-bold leading-[1.05] tracking-tight text-ink md:text-6xl">
-            See the mechanics
-            <br />
-            behind the{" "}
+            Understand your{" "}
             <span className="relative inline-block">
               landing.
-              <Squiggle
-                className="absolute -bottom-2 left-0 h-3 w-full"
-                color="bloom"
+              <span
+                aria-hidden="true"
+                className="absolute -bottom-1 left-0 h-1 w-full rounded-full bg-track"
               />
             </span>
           </h1>
 
           <p className="mt-6 max-w-md text-lg leading-relaxed text-muted">
-            Upload a jump-landing clip. VALT tracks body landmarks and measures
-            the movement patterns that injury-prevention research links to ACL risk,
-            including knee flexion, dynamic valgus, trunk lean, and side-to-side asymmetry.
+            Female athletes face a substantially higher burden of ACL injury in
+            jumping and cutting sports, and most tears happen with no contact to
+            the knee at all. VALT uses two smartphone videos to measure the
+            landing mechanics researchers study as modifiable risk factors, the
+            kind of analysis that&apos;s usually locked inside a biomechanics lab.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
             <Button href="/capture" variant="primary">
-              Record with guided capture →
+              Analyze my landing →
             </Button>
             <Button href="/#how" variant="outline">
               See how it works
@@ -87,24 +63,13 @@ export default function Hero() {
           </p>
         </div>
 
-        {/* ---- Right: the signature pose skeleton ---- */}
+        {/* ---- Right: the signature pose skeleton, a dark instrument card ---- */}
         <div className="relative">
-          {/* A small glow tucked behind the card corner — the instrument
-              readout itself stays clean and precise, the whimsy lives
-              around it. */}
-          <GradientBlob
-            id="hero-card-glow"
-            from="iris"
-            to="bloom"
-            className="-right-8 -top-8 h-32 w-32 opacity-50"
-          />
-          <Sparkle className="absolute -right-2 -top-2 z-10 h-5 w-5 animate-wiggle" color="iris" />
-
-          <div className="relative rounded-2xl border border-line bg-white p-6 shadow-sm">
+          <div className="relative overflow-hidden rounded-2xl bg-ink p-6 shadow-lg">
             {/* Little header row that mimics an analysis readout */}
             <div className="mb-4 flex items-center justify-between">
-              <span className="font-mono text-xs text-muted">landing_frame.pose</span>
-              <span className="rounded bg-track-soft px-2 py-0.5 font-mono text-[10px] text-track">
+              <span className="font-mono text-xs text-surface/60">landing_frame.pose</span>
+              <span className="rounded bg-white/10 px-2 py-0.5 font-mono text-[10px] text-track">
                 33 landmarks
               </span>
             </div>
@@ -135,9 +100,9 @@ function Readout({
   risk?: boolean;
 }) {
   return (
-    <div className="rounded-lg bg-surface px-3 py-2">
-      <div className="font-mono text-[10px] uppercase tracking-wide text-muted">{label}</div>
-      <div className={`font-mono text-lg font-bold ${risk ? "text-risk" : "text-ink"}`}>
+    <div className="rounded-lg bg-white/5 px-3 py-2">
+      <div className="font-mono text-[10px] uppercase tracking-wide text-surface/50">{label}</div>
+      <div className={`font-mono text-lg font-bold ${risk ? "text-risk" : "text-surface"}`}>
         {value}
       </div>
     </div>
@@ -205,7 +170,7 @@ function PoseSkeleton() {
             cx={P[k][0]}
             cy={P[k][1]}
             r={isKnee ? 6 : 4.5}
-            fill={isKnee ? "#E0552B" : "#132033"}
+            fill={isKnee ? "#E0552B" : "#F5F7FA"}
             className="animate-pulseNode"
             style={{ animationDelay: `${(i % 6) * 0.25}s`, transformOrigin: "center",
                      transformBox: "fill-box" as const }}

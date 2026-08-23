@@ -5,20 +5,10 @@
 // ============================================================
 
 import Link from "next/link";
-import { GradientBlob } from "@/components/decor/Doodles";
 
 export default function About() {
   return (
-    <section id="about" className="relative overflow-hidden border-t border-line bg-white">
-      {/* A quiet color wash behind the mission column only — the honesty
-          panel to the right stays plain risk/track colors, untouched. */}
-      <GradientBlob
-        id="about-blob"
-        from="sprout"
-        to="track"
-        className="-left-20 top-1/2 h-72 w-72 -translate-y-1/2 opacity-25"
-      />
-
+    <section id="about" className="border-t border-line bg-white">
       <div className="relative mx-auto max-w-6xl px-6 py-20">
         <div className="grid gap-12 md:grid-cols-2 md:items-start">
           {/* Mission */}
@@ -27,13 +17,17 @@ export default function About() {
               About the project
             </span>
             <h2 className="mt-3 font-display text-3xl font-bold tracking-tight text-ink md:text-4xl">
-              Injury-prevention screening, made accessible
+              Built for the athletes research is still catching up to
             </h2>
             <p className="mt-5 leading-relaxed text-muted">
-              ACL tears are among the most common and serious injuries in youth and
-              amateur sport, and they often follow identifiable movement patterns during
-              landing. The tools that measure those patterns usually live in
-              biomechanics labs with expensive motion-capture systems.
+              Female athletes carry a disproportionate share of ACL injuries in
+              jumping and cutting sports, and ACL injury is multifactorial, no
+              single factor decides who gets hurt. Landing mechanics and
+              neuromuscular control are among the modifiable factors researchers
+              study, and adolescence, when movement patterns are still forming,
+              is exactly when that training matters most. The tools that measure
+              those patterns usually live in biomechanics labs with expensive
+              motion-capture systems.
             </p>
             <p className="mt-4 leading-relaxed text-muted">
               VALT (Valgus Analysis & Landing Tracker) brings a version of that analysis to any smartphone, so
@@ -44,7 +38,7 @@ export default function About() {
               href="/why"
               className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-track hover:underline"
             >
-              See the research behind this, and what LESS actually is →
+              Read HER ACL: the research behind this, and what LESS actually is →
             </Link>
           </div>
 
@@ -63,7 +57,7 @@ export default function About() {
               </li>
               <li className="flex gap-3">
                 <span className="mt-1 font-mono text-track">is</span>
-                <span>An educational way to visualize and track landing quality over time.</span>
+                <span>An educational way to visualize landing quality after each scan.</span>
               </li>
               <li className="flex gap-3">
                 <span className="mt-1 font-mono text-risk">not</span>

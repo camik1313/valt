@@ -8,8 +8,8 @@
 export default function Footer() {
   return (
     <footer className="border-t border-line bg-white">
-      {/* A thin gradient hairline — a small, quiet signature touch. */}
-      <div aria-hidden="true" className="h-[3px] w-full bg-gradient-to-r from-bloom via-iris to-sprout" />
+      {/* A thin hairline in the brand accent — a small, quiet signature touch. */}
+      <div aria-hidden="true" className="h-[3px] w-full bg-track" />
       <div className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
           {/* Brand + one-line description */}
@@ -23,8 +23,8 @@ export default function Footer() {
               <span className="font-display font-bold text-ink">VALT</span>
             </div>
             <p className="mt-3 text-sm text-muted">
-              Movement analysis for jump landings, built to support ACL injury-prevention
-              education.
+              Movement analysis built for female athletes, making ACL
+              injury-prevention research accessible from a smartphone.
             </p>
           </div>
 
@@ -32,15 +32,14 @@ export default function Footer() {
           <div className="flex gap-12 text-sm">
             <div className="flex flex-col gap-2">
               <span className="font-medium text-ink">Product</span>
-              <a href="/#how" className="text-muted hover:text-ink">How it works</a>
-              <a href="/#features" className="text-muted hover:text-ink">Features</a>
-              <a href="/capture" className="text-muted hover:text-ink">Record a video</a>
+              <a href="/capture" className="text-muted hover:text-ink">Analyze</a>
+              <a href="/exercises" className="text-muted hover:text-ink">Exercises</a>
+              <a href="/compare" className="text-muted hover:text-ink">Compare</a>
             </div>
             <div className="flex flex-col gap-2">
-              <span className="font-medium text-ink">Project</span>
+              <span className="font-medium text-ink">Learn</span>
+              <a href="/why" className="text-muted hover:text-ink">HER ACL</a>
               <a href="/#about" className="text-muted hover:text-ink">About</a>
-              <a href="/why" className="text-muted hover:text-ink">Why VALT</a>
-              <a href="/history" className="text-muted hover:text-ink">History</a>
             </div>
           </div>
         </div>

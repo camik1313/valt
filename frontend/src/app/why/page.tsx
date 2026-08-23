@@ -14,9 +14,7 @@
 //      validated as universal).
 // ============================================================
 
-import Link from "next/link";
 import Button from "@/components/ui/Button";
-import { GradientBlob, Sparkle } from "@/components/decor/Doodles";
 
 type Stat = {
   value: string;
@@ -74,23 +72,71 @@ export default function WhyPage() {
   return (
     <>
       {/* ---------- HERO ---------- */}
-      <section className="relative overflow-hidden border-b border-line">
-        <GradientBlob id="why-blob-1" from="bloom" to="iris" className="-left-20 -top-20 h-72 w-72 opacity-30 animate-drift" />
-        <GradientBlob id="why-blob-2" from="sprout" to="track" className="-right-16 top-16 h-64 w-64 opacity-25 animate-drift [animation-delay:-4s]" />
+      <section className="border-b border-line">
         <div className="relative mx-auto max-w-4xl px-6 py-16 md:py-20">
           <span className="font-mono text-xs uppercase tracking-widest text-track">
-            Why VALT
+            Learn
           </span>
           <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-ink md:text-5xl">
-            The research behind the screen
+            HER ACL
           </h1>
           <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted">
-            ACL tears are common, costly, and, in most cases, non-contact, which means
-            the movement pattern behind the injury is often visible on video. VALT exists
-            to put a validated piece of that screening process (the Landing Error Scoring
-            System) in reach of any coach, athlete, or trainer with a smartphone.
-            Here&apos;s the actual research it&apos;s built on, and exactly what that
-            clinical tool is.
+            ACL tears are common, costly, and, in most cases, non-contact, and
+            female athletes carry a disproportionate share of that burden in
+            jumping and cutting sports. Here&apos;s what the research actually
+            says about why, what&apos;s modifiable, and the validated clinical
+            tool (the Landing Error Scoring System) VALT puts within reach of
+            any coach, athlete, or trainer with a smartphone.
+          </p>
+        </div>
+      </section>
+
+      {/* ---------- WHY FEMALE ATHLETES ---------- */}
+      <section className="border-b border-line bg-white">
+        <div className="mx-auto max-w-4xl px-6 py-16">
+          <span className="font-mono text-xs uppercase tracking-widest text-track">
+            Why female athletes?
+          </span>
+          <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
+            What the research actually supports, and where it stops
+          </h2>
+          <ul className="mt-6 space-y-4 text-sm leading-relaxed text-muted">
+            <li>
+              <strong className="text-ink">Female athletes carry a disproportionate burden.</strong>{" "}
+              Across sports and studies, they tear their ACL at several times
+              the rate of male athletes in the same sport (see the numbers below).
+            </li>
+            <li>
+              <strong className="text-ink">ACL injury is multifactorial.</strong>{" "}
+              No single factor, biomechanical, hormonal, anatomical, or otherwise,
+              determines whether any individual athlete will get hurt. Researchers
+              study a mix of contributing factors, not one root cause.
+            </li>
+            <li>
+              <strong className="text-ink">Landing mechanics and neuromuscular control are modifiable.</strong>{" "}
+              Unlike anatomy, how an athlete lands, absorbs force, and controls her
+              knee during a jump is something training can change, which is exactly
+              why movement-quality screens like LESS exist.
+            </li>
+            <li>
+              <strong className="text-ink">Adolescence is a critical window.</strong>{" "}
+              Movement patterns are still forming during the teenage years, making
+              this an especially relevant period to build good landing mechanics,
+              not just correct bad ones later.
+            </li>
+            <li>
+              <strong className="text-ink">Neuromuscular training has real evidence behind it.</strong>{" "}
+              Structured injury-prevention programs that target landing and
+              cutting mechanics have published evidence supporting their use in
+              reducing injury risk.
+            </li>
+          </ul>
+          <p className="mt-6 rounded-xl bg-surface p-4 text-xs leading-relaxed text-muted">
+            What this page won&apos;t claim: that female athletes have
+            &ldquo;weaker knees,&rdquo; or that any single biological difference
+            explains the gap. The honest research answer is more complicated than
+            that, and less useful for training than focusing on what&apos;s
+            actually modifiable.
           </p>
         </div>
       </section>
@@ -98,12 +144,9 @@ export default function WhyPage() {
       {/* ---------- STATS ---------- */}
       <section className="border-b border-line bg-white">
         <div className="mx-auto max-w-6xl px-6 py-16">
-          <div className="flex items-center gap-2">
-            <Sparkle className="h-4 w-4" color="bloom" />
-            <span className="font-mono text-xs uppercase tracking-widest text-track">
-              ACL tears, by the numbers
-            </span>
-          </div>
+          <span className="font-mono text-xs uppercase tracking-widest text-track">
+            ACL tears, by the numbers
+          </span>
           <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
             Every figure here is cited. See References below
           </h2>

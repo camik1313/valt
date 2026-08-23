@@ -46,7 +46,7 @@ export default function HistoryPage() {
           </h1>
           <p className="mt-1 text-muted">Every saved analysis, newest first.</p>
         </div>
-        <Button href="/capture" variant="primary" className="!px-5 !py-2">Record a video</Button>
+        <Button href="/capture" variant="primary" className="!px-5 !py-2">Analyze my landing</Button>
       </div>
 
       {/* Loading */}
@@ -71,7 +71,7 @@ export default function HistoryPage() {
           <p className="font-display text-lg font-semibold text-ink">No analyses yet</p>
           <p className="mt-1 text-sm text-muted">Record a jump-landing video to see it here.</p>
           <div className="mt-5">
-            <Button href="/capture" variant="primary">Record a video</Button>
+            <Button href="/capture" variant="primary">Analyze my landing</Button>
           </div>
         </div>
       )}

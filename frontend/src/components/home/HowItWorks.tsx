@@ -9,26 +9,22 @@ const steps = [
   {
     n: "01",
     title: "Record & upload",
-    body: "Film a jump landing from the front on any smartphone. Upload the clip, no special equipment or sensors required.",
-    gradient: "from-bloom to-iris",
+    body: "Film a jump landing from the front and side on any smartphone. No special equipment or sensors required.",
   },
   {
     n: "02",
     title: "Track landmarks",
     body: "Pose estimation locates 33 body landmarks in every frame, following joints through the full landing motion.",
-    gradient: "from-iris to-track",
   },
   {
     n: "03",
     title: "Measure at landing",
     body: "The software finds the landing frame and computes knee flexion, dynamic valgus, trunk lean, hip position, and left/right asymmetry.",
-    gradient: "from-track to-sprout",
   },
   {
     n: "04",
     title: "Read the report",
     body: "Get clear graphs and a plain-language summary of which measurements fall inside or outside research-informed ranges.",
-    gradient: "from-sprout to-bloom",
   },
 ];
 
@@ -55,9 +51,7 @@ export default function HowItWorks() {
               {i < steps.length - 1 && (
                 <div className="absolute left-12 top-5 hidden h-px w-full bg-line md:block" />
               )}
-              <div
-                className={`relative flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br font-mono text-sm font-bold text-white ${s.gradient}`}
-              >
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-ink font-mono text-sm font-bold text-track">
                 {s.n}
               </div>
               <h3 className="mt-4 font-display text-lg font-semibold text-ink">{s.title}</h3>

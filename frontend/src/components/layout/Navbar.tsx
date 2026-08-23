@@ -15,9 +15,9 @@ export default function Navbar() {
         <Link href="/" className="flex items-center gap-2">
           {/* Small SVG mark: two landmark dots joined by a line — the pose motif. */}
           <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
-            <line x1="7" y1="7" x2="19" y2="19" stroke="#8B6BF2" strokeWidth="2" />
+            <line x1="7" y1="7" x2="19" y2="19" stroke="#0E7C86" strokeWidth="2" />
             <circle cx="7" cy="7" r="4" fill="#132033" />
-            <circle cx="19" cy="19" r="4" fill="#EC5A94" />
+            <circle cx="19" cy="19" r="4" fill="#0E7C86" />
           </svg>
           <span className="font-display text-lg font-bold tracking-tight text-ink">
             VALT
@@ -26,23 +26,23 @@ export default function Navbar() {
 
         {/* ---- Center links (hidden on small screens) ---- */}
         <div className="hidden items-center gap-8 md:flex">
-          <Link href="/#how" className="text-sm text-muted transition-colors hover:text-ink">
-            How it works
+          <Link href="/capture" className="text-sm text-muted transition-colors hover:text-ink">
+            Analyze
           </Link>
-          <Link href="/#features" className="text-sm text-muted transition-colors hover:text-ink">
-            Features
+          <Link href="/exercises" className="text-sm text-muted transition-colors hover:text-ink">
+            Exercises
           </Link>
-          <Link href="/#about" className="text-sm text-muted transition-colors hover:text-ink">
-            About
+          <Link href="/compare" className="text-sm text-muted transition-colors hover:text-ink">
+            Compare
           </Link>
           <Link href="/why" className="text-sm text-muted transition-colors hover:text-ink">
-            Why VALT
+            Learn
           </Link>
         </div>
 
         {/* ---- Primary action ---- */}
         <Button href="/capture" variant="primary" className="!px-5 !py-2">
-          Record a video
+          Analyze my landing
         </Button>
       </nav>
     </header>

@@ -16,15 +16,6 @@
   }
   body {
     @apply bg-surface text-ink font-body antialiased;
-    /* A faint, fixed pink/purple/green wash behind every page — subtle
-       enough to never compete with white cards or status colors, just
-       enough to make the whole app (not only the homepage) feel warmer. */
-    background-image:
-      radial-gradient(640px circle at 6% -8%, rgba(236, 90, 148, 0.10), transparent 60%),
-      radial-gradient(640px circle at 100% 0%, rgba(139, 107, 242, 0.10), transparent 60%),
-      radial-gradient(720px circle at 50% 130%, rgba(47, 189, 126, 0.08), transparent 60%);
-    background-repeat: no-repeat;
-    background-attachment: fixed;
   }
 }
 
