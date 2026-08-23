@@ -51,6 +51,10 @@ export type QuestionnaireAnswers = {
     | null;
   fatigueReported?: boolean | null;
   previousLowerLimbInjury?: boolean | null;
+  // When true, exercise recommendations are withheld entirely (see
+  // ExerciseRecommendations.gatedReason below) — an active injury is a
+  // reason to see a clinician, not a reason to get a workout suggestion.
+  currentPainOrInjury?: boolean | null;
 };
 
 // One factor that moved the screening score, in plain language.
@@ -141,6 +145,57 @@ export type ProtocolCheck = {
   note: string;
 };
 
+// ============================================================
+// EXERCISE RECOMMENDATIONS — mirrors backend/app/exercises/priorities.py
+// (what's flagged) and ranking.py (what's recommended for it). Every
+// exercise traces to a real, cited injury-prevention program; see
+// backend/app/exercises/database.py and research_library.py.
+// ============================================================
+
+export type MovementPriority = {
+  target: string;         // e.g. "frontal_knee_control"
+  targetLabel: string;     // e.g. "frontal knee control"
+  severity: number;         // 0..1
+  evidence: string[];
+};
+
+// One exercise from the library, no personalization applied — this is
+// the shape GET /exercises returns for the browsable library page.
+export type ExerciseInfo = {
+  exerciseId: string;
+  exerciseName: string;
+  shortDescription: string;
+  instructions: string[];
+  movementTargets: string[];
+  difficulty: "beginner" | "intermediate" | "advanced";
+  equipment: string;
+  ageRanges: string[];
+  sports: string[];
+  competitiveLevels: string[];
+  researchSource: string;
+  sourceProgram: string;
+  safetyNotes: string;
+};
+
+// One exercise as ranked against a specific athlete's scan.
+export type RecommendedExercise = ExerciseInfo & {
+  score: number;
+  matchedTargets: string[];
+  why: string;
+};
+
+// The full recommendation result attached to an Analysis.
+export type ExerciseRecommendations = {
+  // Non-null means recommendations were deliberately withheld, and why
+  // (e.g. the athlete reported current pain or injury). Distinct from
+  // "computed, and nothing was flagged," which returns gatedReason: null
+  // with empty arrays.
+  gatedReason: string | null;
+  priorities: MovementPriority[];
+  exercises: RecommendedExercise[];
+  disclaimer: string;
+};
+
 // A single completed analysis of one video.
 export type Analysis = {
   id: string;
@@ -160,6 +215,11 @@ export type Analysis = {
   // Measured box-jump protocol fidelity. null when calibration wasn't
   // available for this analysis (see ProtocolCheck above).
   protocolCheck: ProtocolCheck | null;
+  // Personalized exercise recommendations from this scan's movement
+  // priorities. null when there's no questionnaire to rank against (no
+  // age to bucket by) — distinct from a computed result with an empty
+  // exercise list.
+  recommendations: ExerciseRecommendations | null;
 };
 
 // The status the upload screen moves through.

@@ -10,7 +10,7 @@
 // without changing code.
 // ============================================================
 
-import { Analysis, CameraView, LessQuestionnaireAnswers, QuestionnaireAnswers } from "./types";
+import { Analysis, CameraView, ExerciseInfo, LessQuestionnaireAnswers, QuestionnaireAnswers } from "./types";
 
 // Read the backend URL from the environment, with a sensible fallback.
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -112,4 +112,13 @@ export async function getReport(id: string): Promise<Analysis> {
 export async function getHistory(): Promise<HistoryItem[]> {
   const res = await fetch(`${API_URL}/history`);
   return handle<HistoryItem[]>(res);
+}
+
+// ---- GET /exercises : the full, static exercise library ----
+// Not personalized — for the browsable /exercises page. Personalized,
+// ranked recommendations come from an Analysis's `recommendations`
+// field instead (see getReport above).
+export async function getExercises(): Promise<ExerciseInfo[]> {
+  const res = await fetch(`${API_URL}/exercises`);
+  return handle<ExerciseInfo[]>(res);
 }

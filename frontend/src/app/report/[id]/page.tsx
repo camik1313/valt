@@ -19,6 +19,7 @@ import ReportChart from "@/components/report/ReportChart";
 import RiskScoreCard from "@/components/risk/RiskScoreCard";
 import LessScoreCard from "@/components/risk/LessScoreCard";
 import ProtocolCheckCard from "@/components/risk/ProtocolCheckCard";
+import RecommendedExercisesCard from "@/components/exercises/RecommendedExercisesCard";
 import Button from "@/components/ui/Button";
 
 export default function ReportPage({ params }: { params: { id: string } }) {
@@ -65,7 +66,7 @@ export default function ReportPage({ params }: { params: { id: string } }) {
         <h1 className="font-display text-2xl font-bold text-ink">Report not found</h1>
         <p className="mt-2 text-sm text-muted">{error ?? "That analysis doesn't exist."}</p>
         <div className="mt-6">
-          <Button href="/capture" variant="primary">Record a video</Button>
+          <Button href="/capture" variant="primary">Analyze my landing</Button>
         </div>
       </section>
     );
@@ -125,6 +126,11 @@ export default function ReportPage({ params }: { params: { id: string } }) {
       {/* Epidemiological risk-factor screening (separate from LESS) */}
       <div className="mt-8">
         <RiskScoreCard riskScore={analysis.riskScore} />
+      </div>
+
+      {/* Personalized exercise recommendations from this scan's priorities */}
+      <div className="mt-8">
+        <RecommendedExercisesCard recommendations={analysis.recommendations} />
       </div>
 
       {/* Disclaimer + actions */}

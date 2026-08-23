@@ -41,6 +41,7 @@ export function isQuestionnaireComplete(a: RequiredAnswers): boolean {
     !!a.activityLevel &&
     a.fatigueReported !== undefined && a.fatigueReported !== null &&
     a.previousLowerLimbInjury !== undefined && a.previousLowerLimbInjury !== null &&
+    a.currentPainOrInjury !== undefined && a.currentPainOrInjury !== null &&
     !!a.overallImpression
   );
 }
@@ -135,6 +136,24 @@ export default function RequiredQuestionnaire({ value, onChange }: Props) {
         value={value.previousLowerLimbInjury ?? null}
         onChange={(v) => set("previousLowerLimbInjury", v)}
       />
+
+      <div>
+        <YesNoField
+          required
+          label="Currently experiencing pain or injury?"
+          value={value.currentPainOrInjury ?? null}
+          onChange={(v) => set("currentPainOrInjury", v)}
+        />
+        {value.currentPainOrInjury === true && (
+          <p className="mt-2 rounded-lg bg-risk-soft/40 p-3 text-xs leading-relaxed text-ink">
+            This tool is intended for movement education, not injury diagnosis
+            or rehabilitation. Because you reported current pain or injury,
+            no exercise recommendations will be generated for this scan.
+            Follow the guidance of your physician, physical therapist, or
+            athletic trainer.
+          </p>
+        )}
+      </div>
 
       <fieldset>
         <legend className="text-sm font-medium text-ink">

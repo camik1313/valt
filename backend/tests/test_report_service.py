@@ -265,3 +265,60 @@ def test_video_deleted_after_primary_failure(tmp_path):
             )
 
     assert not os.path.exists(video_path)
+
+
+# ---- Exercise recommendations ----
+
+def test_recommendations_computed_from_flagged_measurement():
+    # _fake_front_view_result's knee_valgus_left=0.20 lands in the "watch"
+    # band (threshold 0.15/0.25), which should surface as a
+    # frontal_knee_control priority and matching exercises.
+    questionnaire = QuestionnaireAnswers(age=16, current_pain_or_injury=False)
+    with patch("app.services.report_service.pipeline.run_pipeline", return_value=_fake_front_view_result()):
+        analysis = report_service.build_analysis(
+            upload_id="test123",
+            athlete_name="Test Athlete",
+            video_filename="jump.mp4",
+            video_path="/fake/path.mp4",
+            view="front",
+            questionnaire=questionnaire,
+        )
+
+    assert analysis.recommendations is not None
+    assert analysis.recommendations.gated_reason is None
+    assert any(p.target == "frontal_knee_control" for p in analysis.recommendations.priorities)
+    assert analysis.recommendations.exercises
+    assert all(analysis.recommendations.exercises[i].score >= analysis.recommendations.exercises[i + 1].score
+               for i in range(len(analysis.recommendations.exercises) - 1))
+
+
+def test_recommendations_gated_when_current_pain_or_injury_reported():
+    questionnaire = QuestionnaireAnswers(age=16, current_pain_or_injury=True)
+    with patch("app.services.report_service.pipeline.run_pipeline", return_value=_fake_front_view_result()):
+        analysis = report_service.build_analysis(
+            upload_id="test123",
+            athlete_name="Test Athlete",
+            video_filename="jump.mp4",
+            video_path="/fake/path.mp4",
+            view="front",
+            questionnaire=questionnaire,
+        )
+
+    assert analysis.recommendations is not None
+    assert analysis.recommendations.gated_reason is not None
+    assert "healthcare professional" in analysis.recommendations.gated_reason
+    assert analysis.recommendations.priorities == []
+    assert analysis.recommendations.exercises == []
+
+
+def test_recommendations_none_without_a_questionnaire():
+    with patch("app.services.report_service.pipeline.run_pipeline", return_value=_fake_front_view_result()):
+        analysis = report_service.build_analysis(
+            upload_id="test123",
+            athlete_name="Test Athlete",
+            video_filename="jump.mp4",
+            video_path="/fake/path.mp4",
+            view="front",
+        )
+
+    assert analysis.recommendations is None

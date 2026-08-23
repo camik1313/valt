@@ -58,6 +58,11 @@ class QuestionnaireAnswers(CamelModel):
     activity_level: ActivityLevel | None = None
     fatigue_reported: bool | None = None
     previous_lower_limb_injury: bool | None = None
+    # When True, exercise recommendations are withheld entirely (see
+    # ExerciseRecommendations.gated_reason below) — an active injury is a
+    # reason to see a clinician, not a reason to get a workout suggestion
+    # from a screening app.
+    current_pain_or_injury: bool | None = None
 
 
 # ---- One factor that moved the screening score, in plain language ----
@@ -146,6 +151,56 @@ class ProtocolCheck(CamelModel):
     note: str = ""
 
 
+# ============================================================
+# EXERCISE RECOMMENDATIONS — see backend/app/exercises/priorities.py
+# (what's flagged) and ranking.py (what's recommended for it). Every
+# exercise traces to a real, cited injury-prevention program; see
+# exercises/research_library.py and exercises/database.py.
+# ============================================================
+
+class MovementPriority(CamelModel):
+    target: str            # e.g. "frontal_knee_control"
+    target_label: str       # e.g. "frontal knee control"
+    severity: float          # 0..1
+    evidence: list[str]
+
+
+# ---- One exercise from the library, no personalization applied ----
+class ExerciseInfo(CamelModel):
+    exercise_id: str
+    exercise_name: str
+    short_description: str
+    instructions: list[str]
+    movement_targets: list[str]
+    difficulty: Literal["beginner", "intermediate", "advanced"]
+    equipment: str
+    age_ranges: list[str]
+    sports: list[str]
+    competitive_levels: list[str]
+    research_source: str
+    source_program: str
+    safety_notes: str
+
+
+# ---- One exercise as ranked against a specific athlete's scan ----
+class RecommendedExercise(ExerciseInfo):
+    score: float
+    matched_targets: list[str]
+    why: str
+
+
+# ---- The full recommendation result attached to an Analysis ----
+class ExerciseRecommendations(CamelModel):
+    # Non-None means recommendations were deliberately withheld, and why
+    # (see report_service.py) — e.g. the athlete reported current pain or
+    # injury. Distinct from "computed, and nothing was flagged," which
+    # returns gated_reason=None with empty lists.
+    gated_reason: str | None = None
+    priorities: list[MovementPriority]
+    exercises: list[RecommendedExercise]
+    disclaimer: str
+
+
 # ---- A complete analysis of one video ----
 class Analysis(CamelModel):
     id: str
@@ -165,6 +220,12 @@ class Analysis(CamelModel):
     # Measured box-jump protocol fidelity. None when calibration wasn't
     # available for this analysis (see ProtocolCheck above).
     protocol_check: ProtocolCheck | None = None
+    # Personalized exercise recommendations from this scan's movement
+    # priorities (see exercises/priorities.py, ranking.py). None when
+    # there's no real questionnaire/measurements to rank against (mock
+    # fallback, or no questionnaire submitted) — distinct from a real,
+    # computed ExerciseRecommendations with an empty exercise list.
+    recommendations: ExerciseRecommendations | None = None
 
 
 # ---- Response after uploading a video ----

@@ -13,19 +13,36 @@
 from app.models.schemas import (
     Analysis,
     ContributingFactor,
+    ExerciseRecommendations,
     LessItemScore,
     LessQuestionnaireAnswers,
     LessScore,
     Metric,
+    MovementPriority,
     PartialScore,
     ProtocolCheck,
     QuestionnaireAnswers,
+    RecommendedExercise,
     RiskScore,
 )
 from app.services import storage
 from app.cv import calibration, pipeline, mock_pipeline
 from app.risk import scoring as risk_scoring
 from app.risk import less as less_scoring
+from app.exercises import priorities as exercise_priorities
+from app.exercises import ranking as exercise_ranking
+
+# Shown on every computed set of exercise recommendations — general
+# conditioning suggestions matched to what this scan flagged, not a
+# prescribed treatment plan. See exercises/database.py's own citations
+# for what backs each individual exercise.
+EXERCISE_DISCLAIMER = (
+    "These exercises are drawn from published injury-prevention programs "
+    "and matched to the movement patterns this scan flagged. They are "
+    "general conditioning suggestions, not a prescribed treatment plan, "
+    "and not a substitute for guidance from a qualified coach, athletic "
+    "trainer, or healthcare professional."
+)
 
 # Set False to force the mock pipeline (instant, fake numbers).
 USE_REAL_PIPELINE = True
@@ -175,6 +192,119 @@ def _to_protocol_check_schema(result: calibration.ProtocolCheckResult) -> Protoc
         landing_distance_delta_cm=result.landing_distance_delta_cm,
         confident=result.confident,
         note=result.note,
+    )
+
+
+def _age_to_range(age: int | None) -> str:
+    """Bucket a raw age into the exercise database's AgeRange brackets
+    (see exercises/database.py). Defensive default of "18+" for a
+    missing age shouldn't occur via the real UI — age is a required
+    questionnaire field — but this must return something rather than
+    crash if it's ever called without one."""
+    if age is None or age >= 18:
+        return "18+"
+    if age >= 16:
+        return "16-17"
+    if age >= 14:
+        return "14-15"
+    return "12-13"
+
+
+def _activity_level_to_competitive_level(activity_level: str | None) -> str | None:
+    """
+    Best-effort mapping from the existing screening questionnaire's
+    activity_level to the exercise database's CompetitiveLevel. Returns
+    None (no filter) for values with no honest equivalent (e.g.
+    "sedentary") rather than guessing one. Every exercise in the current
+    database lists every competitive level anyway (see
+    exercises/ranking.py's module docstring), so this mapping doesn't
+    change today's output — it's here so it's already correct once the
+    database gains exercises that differentiate by level.
+    """
+    return {
+        "recreational": "recreational",
+        "competitive_high_school": "high_school",
+        "competitive_college_or_pro": "college",
+    }.get(activity_level or "")
+
+
+def _build_recommendations(
+    less_result: less_scoring.LessResult | None,
+    metrics_list: list[Metric],
+    questionnaire: QuestionnaireAnswers | None,
+) -> ExerciseRecommendations | None:
+    """
+    Build personalized exercise recommendations from this scan's movement
+    priorities (exercises/priorities.py) and the verified exercise
+    library (exercises/ranking.py). Returns None — not computed — when
+    there's no questionnaire to rank against, since age lives there and
+    there's no honest default for it.
+
+    sport is deliberately never passed to the ranking call: the existing
+    questionnaire's sport_type is a coarse bucket (pivoting/cutting,
+    field/court, endurance) not one of the exercise database's specific
+    sports (soccer, basketball, ...), and there's no honest way to guess
+    which specific sport from that bucket.
+    """
+    if questionnaire is None:
+        return None
+
+    if questionnaire.current_pain_or_injury:
+        return ExerciseRecommendations(
+            gated_reason=(
+                "Because you reported current pain or injury, this app will "
+                "not generate individualized training recommendations. "
+                "Follow the rehabilitation or activity guidance provided by "
+                "your healthcare professional."
+            ),
+            priorities=[],
+            exercises=[],
+            disclaimer=EXERCISE_DISCLAIMER,
+        )
+
+    less_items = less_result.items if less_result else []
+    metric_status = {m.key: m.status for m in metrics_list}
+    detected = exercise_priorities.detect_priorities(less_items, metric_status)
+
+    ranked = exercise_ranking.rank_exercises(
+        detected,
+        age_range=_age_to_range(questionnaire.age),
+        competitive_level=_activity_level_to_competitive_level(questionnaire.activity_level),
+    )
+
+    return ExerciseRecommendations(
+        gated_reason=None,
+        priorities=[
+            MovementPriority(
+                target=p.target,
+                target_label=exercise_priorities.TARGET_LABELS.get(p.target, p.target),
+                severity=p.severity,
+                evidence=p.evidence,
+            )
+            for p in detected
+        ],
+        exercises=[
+            RecommendedExercise(
+                exercise_id=r.exercise.exercise_id,
+                exercise_name=r.exercise.exercise_name,
+                short_description=r.exercise.short_description,
+                instructions=r.exercise.instructions,
+                movement_targets=r.exercise.movement_targets,
+                difficulty=r.exercise.difficulty,
+                equipment=r.exercise.equipment,
+                age_ranges=r.exercise.age_ranges,
+                sports=r.exercise.sports,
+                competitive_levels=r.exercise.competitive_levels,
+                research_source=r.exercise.research_source,
+                source_program=r.exercise.source_program,
+                safety_notes=r.exercise.safety_notes,
+                score=r.score,
+                matched_targets=r.matched_targets,
+                why=r.why,
+            )
+            for r in ranked
+        ],
+        disclaimer=EXERCISE_DISCLAIMER,
     )
 
 
@@ -471,17 +601,22 @@ def build_analysis(
     if not used_mock and protocol_check_result is not None:
         protocol_check_schema = _to_protocol_check_schema(protocol_check_result)
 
-    # ---- 7) Summary ----
+    # ---- 7) Exercise recommendations (from this scan's movement priorities) ----
+    recommendations_schema = None
+    if not used_mock:
+        recommendations_schema = _build_recommendations(less_result, metrics_list, questionnaire)
+
+    # ---- 8) Summary ----
     view_label = "+".join(views_used)
     summary = _build_summary(athlete_name, used_mock, fallback_reason, metrics_list, less_result, notes)
 
-    # ---- 8) Delete both videos now that every measurement has been
+    # ---- 9) Delete both videos now that every measurement has been
     # extracted — nothing past this point needs the raw footage. Covers
     # the side clip whether it succeeded or failed above.
     storage.delete_video(video_path)
     storage.delete_video(side_video_path)
 
-    # ---- 9) Assemble ----
+    # ---- 10) Assemble ----
     combined_filename = video_filename
     if side_video_filename:
         combined_filename = f"{video_filename} + {side_video_filename}"
@@ -497,4 +632,5 @@ def build_analysis(
         risk_score=risk_score,
         less_score=less_score_schema,
         protocol_check=protocol_check_schema,
+        recommendations=recommendations_schema,
     )

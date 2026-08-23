@@ -3,14 +3,14 @@
 #
 # When you run `uvicorn app.main:app`, uvicorn looks in this file
 # for a variable named `app`. That's the FastAPI application. Here
-# we create it, configure CORS, and plug in all four route files.
+# we create it, configure CORS, and plug in all route files.
 # ============================================================
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api.routes import upload, analyze, report, history
+from app.api.routes import upload, analyze, report, history, exercises
 
 # Create the application. The title/description show up in the
 # auto-generated docs at http://localhost:8000/docs.
@@ -39,6 +39,7 @@ app.include_router(upload.router)
 app.include_router(analyze.router)
 app.include_router(report.router)
 app.include_router(history.router)
+app.include_router(exercises.router)
 
 
 # A simple health-check endpoint. Hosts like Render ping this to see
