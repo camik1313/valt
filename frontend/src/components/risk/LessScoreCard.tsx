@@ -16,7 +16,7 @@ import { LessItemScore, LessScore } from "@/lib/types";
 
 const BAND_STYLES: Record<LessScore["band"], { badge: string; text: string; label: string; bar: string }> = {
   low:      { badge: "bg-track-soft", text: "text-track",     label: "Low",      bar: "bg-track" },
-  moderate: { badge: "bg-amber-100",  text: "text-amber-700", label: "Moderate", bar: "bg-amber-500" },
+  moderate: { badge: "bg-watch-soft", text: "text-watch",     label: "Moderate", bar: "bg-watch" },
   high:     { badge: "bg-risk-soft",  text: "text-risk",      label: "High",     bar: "bg-risk" },
 };
 

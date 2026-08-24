@@ -21,9 +21,9 @@ type ButtonProps = {
 // Shared base styles for every button.
 const base =
   "inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 " +
-  "font-body font-medium text-sm transition-all duration-200 " +
+  "font-body font-medium text-sm transition-all duration-200 hover:scale-[1.03] active:scale-[0.98] " +
   "focus:outline-none focus-visible:ring-2 focus-visible:ring-track focus-visible:ring-offset-2 " +
-  "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:shadow-none";
+  "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:shadow-none disabled:hover:scale-100";
 
 // Variant-specific styles.
 const variants = {

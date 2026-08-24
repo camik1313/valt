@@ -11,19 +11,28 @@
 // content.
 // ============================================================
 
-// A small rounded-square badge behind an icon, tinted with the single
-// brand accent (track). Caller sizes it (e.g. "h-9 w-9") and passes the
-// icon as children.
+const BADGE_BG: Record<"track" | "spark" | "watch", string> = {
+  track: "bg-track-soft",
+  spark: "bg-spark-soft",
+  watch: "bg-watch-soft",
+};
+
+// A small rounded-square badge behind an icon. Caller sizes it (e.g.
+// "h-9 w-9"), optionally picks which accent tints it (defaults to the
+// single brand accent, track), and passes the icon as children. The
+// color choice is decorative only — never used to signal status.
 export function IconBadge({
   className = "",
+  color = "track",
   children,
 }: {
   className?: string;
+  color?: "track" | "spark" | "watch";
   children?: React.ReactNode;
 }) {
   return (
     <div
-      className={`flex items-center justify-center rounded-xl bg-track-soft ${className}`}
+      className={`flex items-center justify-center rounded-xl ${BADGE_BG[color]} ${className}`}
     >
       {children}
     </div>

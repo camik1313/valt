@@ -5,7 +5,19 @@
 // ============================================================
 
 import Link from "next/link";
+import { Video, Dumbbell, GitCompareArrows, BookOpen } from "lucide-react";
 import Button from "@/components/ui/Button";
+
+// One accent per link, cycling through the broader palette — purely
+// decorative (which icon gets which color carries no meaning), so it's
+// safe to vary even though track/watch/risk stay reserved for status
+// elsewhere in the app.
+const NAV_LINKS = [
+  { href: "/capture", label: "Analyze", Icon: Video, hover: "group-hover:text-track" },
+  { href: "/exercises", label: "Exercises", Icon: Dumbbell, hover: "group-hover:text-spark" },
+  { href: "/compare", label: "Compare", Icon: GitCompareArrows, hover: "group-hover:text-watch" },
+  { href: "/why", label: "Learn", Icon: BookOpen, hover: "group-hover:text-risk" },
+] as const;
 
 export default function Navbar() {
   return (
@@ -26,18 +38,16 @@ export default function Navbar() {
 
         {/* ---- Center links (hidden on small screens) ---- */}
         <div className="hidden items-center gap-8 md:flex">
-          <Link href="/capture" className="text-sm text-muted transition-colors hover:text-ink">
-            Analyze
-          </Link>
-          <Link href="/exercises" className="text-sm text-muted transition-colors hover:text-ink">
-            Exercises
-          </Link>
-          <Link href="/compare" className="text-sm text-muted transition-colors hover:text-ink">
-            Compare
-          </Link>
-          <Link href="/why" className="text-sm text-muted transition-colors hover:text-ink">
-            Learn
-          </Link>
+          {NAV_LINKS.map(({ href, label, Icon, hover }) => (
+            <Link
+              key={href}
+              href={href}
+              className="group flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-ink"
+            >
+              <Icon size={15} className={`text-muted transition-colors ${hover}`} aria-hidden="true" />
+              {label}
+            </Link>
+          ))}
         </div>
 
         {/* ---- Primary action ---- */}

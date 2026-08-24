@@ -45,7 +45,7 @@ export default function ProtocolCheckCard({
         </div>
         <span
           className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            confident ? "bg-track-soft text-track" : "bg-amber-100 text-amber-700"
+            confident ? "bg-track-soft text-track" : "bg-watch-soft text-watch"
           }`}
         >
           {confident ? "Measured" : "Uncertain"}

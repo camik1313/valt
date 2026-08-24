@@ -38,7 +38,7 @@ const RATING_LABEL: Record<LandingProfileCategory["rating"], string> = {
 
 const RATING_TEXT_CLASS: Record<LandingProfileCategory["rating"], string> = {
   ok: "text-track",
-  watch: "text-amber-700",
+  watch: "text-watch",
   flag: "text-risk",
   unavailable: "text-muted",
 };

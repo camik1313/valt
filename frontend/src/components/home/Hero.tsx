@@ -58,6 +58,14 @@ export default function Hero() {
             </Button>
           </div>
 
+          {/* Quick facts — purely decorative color variety, every claim is
+              real and already stated elsewhere on this page / the report. */}
+          <div className="mt-6 flex flex-wrap gap-2">
+            <FactPill emoji="🎯" text="Real, cited 17-item LESS assessment" color="track" />
+            <FactPill emoji="📱" text="No lab equipment needed" color="spark" />
+            <FactPill emoji="🔒" text="Video deleted after analysis" color="watch" />
+          </div>
+
           <p className="mt-6 text-xs text-muted">
             Measures movement mechanics. Does not diagnose injuries.
           </p>
@@ -86,6 +94,31 @@ export default function Hero() {
         </div>
       </div>
     </section>
+  );
+}
+
+// A small colored pill for a real, already-stated fact — decoration only,
+// never used for a number or measurement (those stay in the dark
+// instrument card / report, in track or risk, never here).
+function FactPill({
+  emoji,
+  text,
+  color,
+}: {
+  emoji: string;
+  text: string;
+  color: "track" | "spark" | "watch";
+}) {
+  const styles = {
+    track: "bg-track-soft text-track",
+    spark: "bg-spark-soft text-spark",
+    watch: "bg-watch-soft text-watch",
+  }[color];
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${styles}`}>
+      <span aria-hidden="true">{emoji}</span>
+      {text}
+    </span>
   );
 }
 

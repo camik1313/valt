@@ -35,6 +35,22 @@ const config: Config = {
           DEFAULT: "#E0552B",
           soft: "#FBE3DA",
         },
+        // "Watch" / borderline status — formalizes what several report
+        // components already rendered ad hoc with Tailwind's default
+        // amber-700/amber-100. Same status meaning as risk/track (ok /
+        // watch / flag), just now a real token instead of a magic string.
+        watch: {
+          DEFAULT: "#B45309",
+          soft: "#FEF3C7",
+        },
+        // SPARK = decorative/engagement accent only — nav, badges, hero
+        // highlights, marketing copy. Never used for a measurement,
+        // score, status, or anything the athlete is meant to read as
+        // clinical data; track/watch/risk keep doing that job alone.
+        spark: {
+          DEFAULT: "#2F6FED",
+          soft: "#DCE7FE",
+        },
         // Hairline borders / dividers.
         line: "#E2E8EF",
       },

@@ -10,7 +10,7 @@ import { Metric } from "@/lib/types";
 // ok = teal (fine), watch = amber (borderline), flag = orange (notable).
 const STATUS_STYLES: Record<Metric["status"], { badge: string; text: string; label: string }> = {
   ok:    { badge: "bg-track-soft",  text: "text-track", label: "Typical" },
-  watch: { badge: "bg-amber-100",   text: "text-amber-700", label: "Borderline" },
+  watch: { badge: "bg-watch-soft",  text: "text-watch",     label: "Borderline" },
   flag:  { badge: "bg-risk-soft",   text: "text-risk", label: "Notable" },
 };
 

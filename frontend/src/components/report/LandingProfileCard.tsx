@@ -13,7 +13,7 @@ import { LandingProfile, LandingProfileCategory } from "@/lib/types";
 
 const RATING_STYLES: Record<LandingProfileCategory["rating"], { badge: string; text: string; label: string }> = {
   ok:          { badge: "bg-track-soft", text: "text-track",     label: "Good" },
-  watch:       { badge: "bg-amber-100",  text: "text-amber-700", label: "Borderline" },
+  watch:       { badge: "bg-watch-soft", text: "text-watch",     label: "Borderline" },
   flag:        { badge: "bg-risk-soft",  text: "text-risk",      label: "Notable" },
   unavailable: { badge: "bg-surface",    text: "text-muted",     label: "Not measured" },
 };

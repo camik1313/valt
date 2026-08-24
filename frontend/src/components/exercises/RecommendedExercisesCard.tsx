@@ -15,6 +15,14 @@
 
 import { ExerciseRecommendations, RecommendedExercise } from "@/lib/types";
 
+// Purely decorative scanning aid — exercise cards are encouraging,
+// actionable content, not clinical data, unlike the report's score cards.
+const DIFFICULTY_EMOJI: Record<RecommendedExercise["difficulty"], string> = {
+  beginner: "🌱",
+  intermediate: "🔥",
+  advanced: "⚡",
+};
+
 export default function RecommendedExercisesCard({
   recommendations,
 }: {
@@ -61,7 +69,7 @@ export default function RecommendedExercisesCard({
       {recommendations.priorities.length === 0 ? (
         <p className="mt-4 text-sm text-muted">
           This landing didn&apos;t flag any specific movement priorities, so
-          there&apos;s nothing targeted to recommend here. Nice landing.
+          there&apos;s nothing targeted to recommend here. Nice landing! 🎉
         </p>
       ) : (
         <>
@@ -128,7 +136,7 @@ function ExerciseCard({ exercise }: { exercise: RecommendedExercise }) {
           {exercise.exerciseName}
         </h3>
         <span className="shrink-0 rounded-full bg-track-soft px-2 py-0.5 text-[11px] font-medium text-track">
-          {exercise.difficulty}
+          <span aria-hidden="true">{DIFFICULTY_EMOJI[exercise.difficulty]}</span> {exercise.difficulty}
         </span>
       </div>
       <p className="mt-1 text-sm text-muted">{exercise.shortDescription}</p>

@@ -8,40 +8,59 @@
 import Card from "@/components/ui/Card";
 import { IconBadge } from "@/components/decor/Doodles";
 
-// The scientific measurements. Each maps to real literature.
+// The scientific measurements. Each maps to real literature. `accent`
+// is purely decorative color variety — cycling through the palette
+// carries no meaning here, unlike track/watch/risk on the report page.
 const metrics = [
   {
     title: "Knee flexion",
     body: "Angle of the knee at landing. Stiff, low-flexion landings are associated with higher joint loading.",
+    accent: "track",
   },
   {
     title: "Dynamic knee valgus",
     body: "Inward collapse of the knee relative to hip and ankle. One of the most-studied ACL-risk patterns.",
+    accent: "spark",
   },
   {
     title: "Trunk lean",
     body: "Forward and lateral tilt of the torso, which shifts load and affects knee control on landing.",
+    accent: "watch",
   },
   {
     title: "Left / right asymmetry",
     body: "Differences between limbs. Large asymmetries can indicate compensation or reduced control on one side.",
+    accent: "track",
   },
   {
     title: "Hip position",
     body: "Hip flexion and drop at landing, part of how force is absorbed up the kinetic chain.",
+    accent: "spark",
   },
-];
+] as const;
 
 // Product-level features. Kept to what's actually true today, not a
 // wishlist — see project rule against overclaiming unbuilt functionality.
 const product = [
-  { title: "Two smartphone angles", body: "Guided front and side capture in one session, no lab or extra equipment." },
-  { title: "No account required", body: "No name, email, or sign-up. Answer a few quick questions and start." },
-  { title: "Real, cited biomechanics", body: "Scored against the published Landing Error Scoring System, not an invented formula." },
-];
+  { title: "Two smartphone angles", body: "Guided front and side capture in one session, no lab or extra equipment.", accent: "track" },
+  { title: "No account required", body: "No name, email, or sign-up. Answer a few quick questions and start.", accent: "spark" },
+  { title: "Real, cited biomechanics", body: "Scored against the published Landing Error Scoring System, not an invented formula.", accent: "watch" },
+] as const;
 
-// Hex for the little crosshair icon inside each IconBadge.
-const ICON_HEX = "#0E7C86"; // track
+// Hex per accent for the little crosshair icon inside each IconBadge.
+const ICON_HEX: Record<string, string> = {
+  track: "#0E7C86",
+  spark: "#2F6FED",
+  watch: "#B45309",
+};
+
+// Tailwind's JIT scanner needs literal class strings, not `bg-${accent}`
+// template interpolation, or it never generates the CSS for them.
+const GLOW_BG: Record<string, string> = {
+  track: "bg-track",
+  spark: "bg-spark",
+  watch: "bg-watch",
+};
 
 export default function Features() {
   return (
@@ -64,11 +83,11 @@ export default function Features() {
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {metrics.map((m) => (
             <Card key={m.title}>
-              <IconBadge className="mb-3 h-9 w-9">
+              <IconBadge className="mb-3 h-9 w-9" color={m.accent}>
                 {/* small target/crosshair icon */}
                 <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                  <circle cx="9" cy="9" r="7" fill="none" stroke={ICON_HEX} strokeWidth="1.5" />
-                  <circle cx="9" cy="9" r="2" fill={ICON_HEX} />
+                  <circle cx="9" cy="9" r="7" fill="none" stroke={ICON_HEX[m.accent]} strokeWidth="1.5" />
+                  <circle cx="9" cy="9" r="2" fill={ICON_HEX[m.accent]} />
                 </svg>
               </IconBadge>
               <h3 className="font-display text-lg font-semibold text-ink">{m.title}</h3>
@@ -87,7 +106,7 @@ export default function Features() {
               {/* a faint corner glow — subtle, doesn't fight the text */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-track opacity-20 blur-2xl"
+                className={`pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full ${GLOW_BG[p.accent]} opacity-20 blur-2xl`}
               />
               <h3 className="relative font-display text-lg font-semibold">{p.title}</h3>
               <p className="relative mt-2 text-sm leading-relaxed text-surface/70">{p.body}</p>

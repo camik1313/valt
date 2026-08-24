@@ -5,28 +5,34 @@
 // design smell; numbering a real sequence is correct.)
 // ============================================================
 
+// `badgeText` is decorative color variety on the step marker only —
+// carries no meaning, unlike track/watch/risk on the report page.
 const steps = [
   {
     n: "01",
     title: "Record & upload",
     body: "Film a jump landing from the front and side on any smartphone. No special equipment or sensors required.",
+    badgeText: "text-track",
   },
   {
     n: "02",
     title: "Track landmarks",
     body: "Pose estimation locates 33 body landmarks in every frame, following joints through the full landing motion.",
+    badgeText: "text-spark",
   },
   {
     n: "03",
     title: "Measure at landing",
     body: "The software finds the landing frame and computes knee flexion, dynamic valgus, trunk lean, hip position, and left/right asymmetry.",
+    badgeText: "text-watch",
   },
   {
     n: "04",
     title: "Read the report",
     body: "Get clear graphs and a plain-language summary of which measurements fall inside or outside research-informed ranges.",
+    badgeText: "text-track",
   },
-];
+] as const;
 
 export default function HowItWorks() {
   return (
@@ -51,7 +57,7 @@ export default function HowItWorks() {
               {i < steps.length - 1 && (
                 <div className="absolute left-12 top-5 hidden h-px w-full bg-line md:block" />
               )}
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-ink font-mono text-sm font-bold text-track">
+              <div className={`relative flex h-10 w-10 items-center justify-center rounded-lg bg-ink font-mono text-sm font-bold ${s.badgeText}`}>
                 {s.n}
               </div>
               <h3 className="mt-4 font-display text-lg font-semibold text-ink">{s.title}</h3>
