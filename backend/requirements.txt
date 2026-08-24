@@ -16,7 +16,12 @@ pydantic-settings==2.7.0
 # Apple Silicon + Python 3.12. Newer versions have had issues loading
 # the `solutions` module on some setups.
 mediapipe==0.10.14
-opencv-python==4.10.0.84
+# opencv-python-headless, not opencv-python: this app never opens a GUI
+# window (no imshow/waitKey anywhere), and the GUI build needs system
+# libraries (libGL, etc.) that a minimal Linux server like Render's
+# doesn't have, which fails the import at startup. Headless has the
+# same API for everything this app actually uses.
+opencv-python-headless==4.10.0.84
 
 # Testing
 pytest==8.3.4
