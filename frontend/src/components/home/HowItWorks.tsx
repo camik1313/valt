@@ -30,7 +30,7 @@ const steps = [
     n: "04",
     title: "Read the report",
     body: "Get clear graphs and a plain-language summary of which measurements fall inside or outside research-informed ranges.",
-    badgeText: "text-track",
+    badgeText: "text-bloom",
   },
 ] as const;
 

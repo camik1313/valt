@@ -16,7 +16,7 @@ const NAV_LINKS = [
   { href: "/capture", label: "Analyze", Icon: Video, hover: "group-hover:text-track" },
   { href: "/exercises", label: "Exercises", Icon: Dumbbell, hover: "group-hover:text-spark" },
   { href: "/compare", label: "Compare", Icon: GitCompareArrows, hover: "group-hover:text-watch" },
-  { href: "/why", label: "Learn", Icon: BookOpen, hover: "group-hover:text-risk" },
+  { href: "/why", label: "Learn", Icon: BookOpen, hover: "group-hover:text-bloom" },
 ] as const;
 
 export default function Navbar() {

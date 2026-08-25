@@ -30,12 +30,12 @@ const metrics = [
   {
     title: "Left / right asymmetry",
     body: "Differences between limbs. Large asymmetries can indicate compensation or reduced control on one side.",
-    accent: "track",
+    accent: "bloom",
   },
   {
     title: "Hip position",
     body: "Hip flexion and drop at landing, part of how force is absorbed up the kinetic chain.",
-    accent: "spark",
+    accent: "track",
   },
 ] as const;
 
@@ -43,7 +43,7 @@ const metrics = [
 // wishlist — see project rule against overclaiming unbuilt functionality.
 const product = [
   { title: "Two smartphone angles", body: "Guided front and side capture in one session, no lab or extra equipment.", accent: "track" },
-  { title: "No account required", body: "No name, email, or sign-up. Answer a few quick questions and start.", accent: "spark" },
+  { title: "No account required", body: "No name, email, or sign-up. Answer a few quick questions and start.", accent: "bloom" },
   { title: "Real, cited biomechanics", body: "Scored against the published Landing Error Scoring System, not an invented formula.", accent: "watch" },
 ] as const;
 
@@ -52,14 +52,17 @@ const ICON_HEX: Record<string, string> = {
   track: "#0E7C86",
   spark: "#2F6FED",
   watch: "#B45309",
+  bloom: "#7C3AED",
 };
 
-// Tailwind's JIT scanner needs literal class strings, not `bg-${accent}`
-// template interpolation, or it never generates the CSS for them.
-const GLOW_BG: Record<string, string> = {
-  track: "bg-track",
-  spark: "bg-spark",
-  watch: "bg-watch",
+// A flat top-border accent, not a blurred gradient glow — Tailwind's JIT
+// scanner needs literal class strings, not `border-${accent}` template
+// interpolation, or it never generates the CSS for them.
+const ACCENT_BORDER: Record<string, string> = {
+  track: "border-t-track",
+  spark: "border-t-spark",
+  watch: "border-t-watch",
+  bloom: "border-t-bloom",
 };
 
 export default function Features() {
@@ -101,15 +104,10 @@ export default function Features() {
           {product.map((p) => (
             <div
               key={p.title}
-              className="rounded-xl bg-gradient-to-br from-ink to-ink/80 p-6 text-surface relative overflow-hidden"
+              className={`rounded-xl border-t-4 bg-ink p-6 text-surface ${ACCENT_BORDER[p.accent]}`}
             >
-              {/* a faint corner glow — subtle, doesn't fight the text */}
-              <div
-                aria-hidden="true"
-                className={`pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full ${GLOW_BG[p.accent]} opacity-20 blur-2xl`}
-              />
-              <h3 className="relative font-display text-lg font-semibold">{p.title}</h3>
-              <p className="relative mt-2 text-sm leading-relaxed text-surface/70">{p.body}</p>
+              <h3 className="font-display text-lg font-semibold">{p.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-surface/70">{p.body}</p>
             </div>
           ))}
         </div>

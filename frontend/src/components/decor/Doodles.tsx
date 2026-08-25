@@ -6,15 +6,19 @@
 // read as a generic pastel sports-app look, at odds with the athletic,
 // data-forward identity (Nike Training Club / WHOOP / Strava, not a
 // school-project illustration style) this app is going for. What's left
-// is IconBadge — a single, disciplined accent color, geometric rather
-// than organic, still marked aria-hidden since it's decoration, not
-// content.
+// is IconBadge — geometric rather than organic, still marked aria-hidden
+// since it's decoration, not content. It now cycles through a broader
+// palette (track/spark/watch/bloom) than the single-accent version that
+// originally replaced the whimsy system, but every one of those colors
+// is a deliberate, disciplined choice, never a pastel grab-bag, and
+// still never used to signal status on a report page.
 // ============================================================
 
-const BADGE_BG: Record<"track" | "spark" | "watch", string> = {
+const BADGE_BG: Record<"track" | "spark" | "watch" | "bloom", string> = {
   track: "bg-track-soft",
   spark: "bg-spark-soft",
   watch: "bg-watch-soft",
+  bloom: "bg-bloom-soft",
 };
 
 // A small rounded-square badge behind an icon. Caller sizes it (e.g.
@@ -27,7 +31,7 @@ export function IconBadge({
   children,
 }: {
   className?: string;
-  color?: "track" | "spark" | "watch";
+  color?: "track" | "spark" | "watch" | "bloom";
   children?: React.ReactNode;
 }) {
   return (

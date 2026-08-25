@@ -25,12 +25,11 @@ export default function Hero() {
       <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-6 py-20 md:grid-cols-2 md:py-28">
         {/* ---- Left: the message ---- */}
         <div className="relative">
-          <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-track">
-            <span className="h-1.5 w-1.5 rounded-full bg-track" />
+          <span className="font-mono text-xs uppercase tracking-widest text-track">
             Movement science for female athletes
           </span>
 
-          <h1 className="mt-6 font-display text-4xl font-bold leading-[1.05] tracking-tight text-ink md:text-6xl">
+          <h1 className="mt-4 font-display text-4xl font-bold leading-[1.05] tracking-tight text-ink md:text-6xl">
             Understand your{" "}
             <span className="relative inline-block">
               landing.
@@ -56,14 +55,6 @@ export default function Hero() {
             <Button href="/#how" variant="outline">
               See how it works
             </Button>
-          </div>
-
-          {/* Quick facts — purely decorative color variety, every claim is
-              real and already stated elsewhere on this page / the report. */}
-          <div className="mt-6 flex flex-wrap gap-2">
-            <FactPill emoji="🎯" text="Real, cited 17-item LESS assessment" color="track" />
-            <FactPill emoji="📱" text="No lab equipment needed" color="spark" />
-            <FactPill emoji="🔒" text="Video deleted after analysis" color="watch" />
           </div>
 
           <p className="mt-6 text-xs text-muted">
@@ -94,31 +85,6 @@ export default function Hero() {
         </div>
       </div>
     </section>
-  );
-}
-
-// A small colored pill for a real, already-stated fact — decoration only,
-// never used for a number or measurement (those stay in the dark
-// instrument card / report, in track or risk, never here).
-function FactPill({
-  emoji,
-  text,
-  color,
-}: {
-  emoji: string;
-  text: string;
-  color: "track" | "spark" | "watch";
-}) {
-  const styles = {
-    track: "bg-track-soft text-track",
-    spark: "bg-spark-soft text-spark",
-    watch: "bg-watch-soft text-watch",
-  }[color];
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${styles}`}>
-      <span aria-hidden="true">{emoji}</span>
-      {text}
-    </span>
   );
 }
 

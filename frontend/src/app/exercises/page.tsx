@@ -36,26 +36,7 @@ const TARGET_FILTER_OPTIONS = Array.from(
   new Map(TARGET_FILTERS.map((t) => [t.label, t])).values()
 );
 
-// Purely decorative scanning aid next to each filter label — exercise
-// suggestions are encouraging content, not clinical data, so a light
-// emoji touch is fine here (unlike the report page's score/metric cards).
-const TARGET_EMOJI: Record<string, string> = {
-  "Landing control": "🛬",
-  "Knee control": "🦵",
-  "Landing depth": "📐",
-  "Trunk control": "🧍",
-  "Symmetry": "⚖️",
-  "Strength": "💪",
-  "Balance": "🤸",
-  "Neuromuscular control": "🧠",
-};
-
 const DIFFICULTIES: ExerciseInfo["difficulty"][] = ["beginner", "intermediate", "advanced"];
-const DIFFICULTY_EMOJI: Record<ExerciseInfo["difficulty"], string> = {
-  beginner: "🌱",
-  intermediate: "🔥",
-  advanced: "⚡",
-};
 
 export default function ExercisesPage() {
   const [exercises, setExercises] = useState<ExerciseInfo[]>([]);
@@ -122,7 +103,7 @@ export default function ExercisesPage() {
         </FilterChip>
         {TARGET_FILTER_OPTIONS.map((t) => (
           <FilterChip key={t.label} active={targetFilter === t.label} onClick={() => setTargetFilter(t.label)}>
-            <span aria-hidden="true">{TARGET_EMOJI[t.label]}</span> {t.label}
+            {t.label}
           </FilterChip>
         ))}
         <span className="mx-1 h-4 w-px bg-line" aria-hidden="true" />
@@ -132,7 +113,7 @@ export default function ExercisesPage() {
             active={difficultyFilter === d}
             onClick={() => setDifficultyFilter(difficultyFilter === d ? null : d)}
           >
-            <span aria-hidden="true">{DIFFICULTY_EMOJI[d]}</span> {d}
+            {d}
           </FilterChip>
         ))}
         <span className="mx-1 h-4 w-px bg-line" aria-hidden="true" />
@@ -204,7 +185,7 @@ function ExerciseLibraryCard({ exercise }: { exercise: ExerciseInfo }) {
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-display text-base font-semibold text-ink">{exercise.exerciseName}</h3>
         <span className="shrink-0 rounded-full bg-track-soft px-2 py-0.5 text-[11px] font-medium capitalize text-track">
-          <span aria-hidden="true">{DIFFICULTY_EMOJI[exercise.difficulty]}</span> {exercise.difficulty}
+          {exercise.difficulty}
         </span>
       </div>
       <p className="mt-1 text-sm text-muted">{exercise.shortDescription}</p>

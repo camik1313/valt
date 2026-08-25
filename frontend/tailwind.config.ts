@@ -51,6 +51,14 @@ const config: Config = {
           DEFAULT: "#2F6FED",
           soft: "#DCE7FE",
         },
+        // BLOOM = a second decorative accent, same rule as spark (never
+        // status/data). A deliberate, saturated violet, not the soft
+        // pastel purple the retired "whimsy" system used — see
+        // components/decor/Doodles.tsx's module comment for that history.
+        bloom: {
+          DEFAULT: "#7C3AED",
+          soft: "#EDE4FC",
+        },
         // Hairline borders / dividers.
         line: "#E2E8EF",
       },

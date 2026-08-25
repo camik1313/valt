@@ -541,13 +541,13 @@ export default function CapturePage() {
         <div className="rounded-2xl border border-line bg-white p-6">
           <h2 className="font-display font-semibold text-ink">Before you record</h2>
           <ul className="mt-3 space-y-2 text-sm text-muted">
-            <li className="flex gap-2"><span aria-hidden="true">📱</span> Prop your phone on something stable, about chest height.</li>
-            <li className="flex gap-2"><span aria-hidden="true">📏</span> Stand back 3–4 m (10–13 ft) so the whole body fits in frame.</li>
-            <li className="flex gap-2"><span aria-hidden="true">🎯</span> Center the camera squarely on the athlete, not off to one side.</li>
-            <li className="flex gap-2"><span aria-hidden="true">💡</span> Good, even lighting. Fitted clothing works best.</li>
-            <li className="flex gap-2"><span aria-hidden="true">📦</span> You&apos;ll need something about 12in (31cm) high to jump off, a stable stair step, a sturdy stool, or a low box. Exact height doesn&apos;t matter, we measure whatever you use.</li>
+            <li className="flex gap-2"><span className="text-track">1.</span> Prop your phone on something stable, about chest height.</li>
+            <li className="flex gap-2"><span className="text-track">2.</span> Stand back 3–4 m (10–13 ft) so the whole body fits in frame.</li>
+            <li className="flex gap-2"><span className="text-track">3.</span> Center the camera squarely on the athlete, not off to one side.</li>
+            <li className="flex gap-2"><span className="text-track">4.</span> Good, even lighting. Fitted clothing works best.</li>
+            <li className="flex gap-2"><span className="text-track">5.</span> You&apos;ll need something about 12in (31cm) high to jump off, a stable stair step, a sturdy stool, or a low box. Exact height doesn&apos;t matter, we measure whatever you use.</li>
             <li className="flex gap-2">
-              <span aria-hidden="true">📍</span>
+              <span className="text-track">6.</span>
               <span>
                 {targetMarkCm !== null ? (
                   <>Place a mark (tape, a towel, anything visible) about <strong className="text-ink">{formatFeetInches(targetMarkCm)}</strong> in front of the box, that&apos;s roughly where you should land.</>
@@ -556,9 +556,9 @@ export default function CapturePage() {
                 )}
               </span>
             </li>
-            <li className="flex gap-2"><span aria-hidden="true">🔔</span> After you tap record: {POSITION_SECONDS}s to get in position, a {STANDING_SECONDS}s &quot;stand still&quot; on the ground, a few seconds to step onto your box, a JUMP cue, then land and immediately jump again as high as you can. All automatic, with beeps to guide you, no need to tap stop.</li>
-            <li className="flex gap-2"><span aria-hidden="true">🔄</span> Afterward you&apos;ll be guided to turn and record the opposite angle too (optional, but it roughly doubles what the screening score can see).</li>
-            <li className="flex gap-2"><span aria-hidden="true">📝</span> A few required questions come right after recording, once you&apos;ve seen your landing.</li>
+            <li className="flex gap-2"><span className="text-track">7.</span> After you tap record: {POSITION_SECONDS}s to get in position, a {STANDING_SECONDS}s &quot;stand still&quot; on the ground, a few seconds to step onto your box, a JUMP cue, then land and immediately jump again as high as you can. All automatic, with beeps to guide you, no need to tap stop.</li>
+            <li className="flex gap-2"><span className="text-track">8.</span> Afterward you&apos;ll be guided to turn and record the opposite angle too (optional, but it roughly doubles what the screening score can see).</li>
+            <li className="flex gap-2"><span className="text-track">9.</span> A few required questions come right after recording, once you&apos;ve seen your landing.</li>
           </ul>
 
           <label className="mt-6 block text-sm font-medium text-ink">
