@@ -186,6 +186,33 @@ def test_front_view_pipeline_measures_known_valgus_with_baseline_correction(monk
     assert "knee_flexion_left" not in result.measurements
 
 
+def test_front_view_baseline_ignores_glitchy_standing_frames(monkeypatch):
+    """Regression for a bug found on a real clip: the standing window is
+    chosen by hip height alone, so it can contain frames where the legs are
+    moving or a landmark glitches. A MEAN baseline let a few wild frames
+    shift the whole correction (left baseline 0.56 vs ~0.03 on that clip);
+    the MEDIAN must not move."""
+    standing = {
+        L_SHOULDER: (0.4, 0.25, 0.0, 1.0), R_SHOULDER: (0.6, 0.25, 0.0, 1.0),
+        L_HIP: (0.4, 0.50, 0.0, 1.0), R_HIP: (0.6, 0.50, 0.0, 1.0),
+        L_KNEE: (0.4, 0.70, 0.0, 1.0), R_KNEE: (0.6, 0.70, 0.0, 1.0),
+        L_ANKLE: (0.4, 0.90, 0.0, 1.0), R_ANKLE: (0.6, 0.90, 0.0, 1.0),
+    }
+    landing = dict(standing)
+    landing[L_KNEE] = (0.44, 0.70, 0.0, 1.0)
+    per_frame = _build_sequence(standing, landing)
+    # Corrupt 4 of the 15 standing frames: left knee flung far sideways
+    # (a ~2.0 hip-width index each, so a mean baseline would be ~0.5).
+    for i in range(3, 7):
+        frame = list(per_frame[i])
+        frame[L_KNEE] = (0.8, 0.70, 0.0, 1.0)
+        per_frame[i] = frame
+
+    result = _run(per_frame, "front", monkeypatch)
+
+    assert result.measurements["knee_valgus_left"] == pytest.approx(-0.20, abs=0.001)
+
+
 def test_front_view_asymmetry_uses_baseline_corrected_values(monkeypatch):
     # Regression test: valgus_asymmetry must be computed from the SAME
     # baseline-corrected numbers reported as knee_valgus_left/right, not

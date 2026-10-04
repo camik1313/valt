@@ -85,3 +85,19 @@ def test_side_view_metric_reports_side_source():
     profile = compute_landing_profile(metrics_list=metrics, less_items=[])
     depth = next(c for c in profile.categories if c.category == "landing_depth")
     assert depth.source_view == "side"
+
+
+def test_outward_knee_motion_is_not_described_as_inward():
+    # Negative valgus index = knee outward of the hip-ankle line. It is
+    # banded on magnitude, so the wording must follow the sign.
+    for status, word in (("flag", "outward"), ("watch", "outward")):
+        profile = compute_landing_profile([_metric("knee_valgus_left", -0.4, status, "HW")], [])
+        knee = next(c for c in profile.categories if c.category == "knee_control")
+        assert word in knee.explanation
+        assert "inward" not in knee.explanation
+
+
+def test_inward_knee_motion_still_described_as_inward():
+    profile = compute_landing_profile([_metric("knee_valgus_left", 0.4, "flag", "HW")], [])
+    knee = next(c for c in profile.categories if c.category == "knee_control")
+    assert "inward" in knee.explanation

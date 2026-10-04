@@ -24,6 +24,7 @@
 # "Left"/"right" are the SUBJECT'S anatomical sides.
 # ============================================================
 
+import statistics
 from dataclasses import dataclass, field
 
 from app.cv import calibration, metrics, pose_estimator
@@ -292,12 +293,18 @@ def run_pipeline(
                 k = kasr_at(fr)
                 if k is not None:
                     kasr_vals.append(k)
+            # MEDIAN, not mean: the standing window is "longest run where hip
+            # height barely moves," which on real footage can still include
+            # frames where the athlete is turning or stepping and a few
+            # landmark glitches (valgus index spiking past 6 on a real clip).
+            # One bad stretch dragged a mean baseline from ~0.03 to ~0.56 and
+            # distorted the reported valgus; a median shrugs those frames off.
             if l_vals:
-                base_valgus["left"] = sum(l_vals) / len(l_vals)
+                base_valgus["left"] = statistics.median(l_vals)
             if r_vals:
-                base_valgus["right"] = sum(r_vals) / len(r_vals)
+                base_valgus["right"] = statistics.median(r_vals)
             if kasr_vals:
-                base_kasr = sum(kasr_vals) / len(kasr_vals)
+                base_kasr = statistics.median(kasr_vals)
             baseline_applied = True
             notes.append(
                 f"Standing baseline found (frames {start}-{end}); valgus reported "

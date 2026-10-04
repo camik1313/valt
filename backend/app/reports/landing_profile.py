@@ -84,6 +84,29 @@ _EXPLANATIONS: dict[str, dict[Rating, str]] = {
     },
 }
 
+# Knee valgus is signed (positive = inward/valgus, negative = outward/varus)
+# but banded on magnitude, so the plain-language line has to follow the sign
+# of the measurement that is actually driving the rating. Otherwise an
+# athlete whose knees flared OUT would be told they moved inward.
+_KNEE_OUTWARD_EXPLANATIONS: dict[Rating, str] = {
+    "flag": "Your knees moved outward relative to your hip and ankle during the landing.",
+    "watch": "Your knee position was borderline, a little outward motion relative to your hip and ankle.",
+}
+
+
+def _explanation(category: str, rating: Rating, representative: Metric | None) -> str:
+    if (
+        category == "knee_control"
+        and rating in _KNEE_OUTWARD_EXPLANATIONS
+        and representative is not None
+        and representative.key.startswith("knee_valgus")
+        and representative.status in ("watch", "flag")
+        and representative.value < 0
+    ):
+        return _KNEE_OUTWARD_EXPLANATIONS[rating]
+    return _EXPLANATIONS[category][rating]
+
+
 _FRONT_VIEW_KEYS = {"knee_valgus_left", "knee_valgus_right", "kasr", "knee_valgus", "valgus_asymmetry", "trunk_lean_lateral"}
 _SIDE_VIEW_KEYS = {"knee_flexion_left", "knee_flexion_right", "knee_flexion", "flexion_asymmetry", "trunk_lean_forward", "trunk_lean"}
 
@@ -164,7 +187,7 @@ def compute_landing_profile(
                 value=representative.value if representative else None,
                 unit=representative.unit if representative else None,
                 metric_label=representative.label if representative else None,
-                explanation=_EXPLANATIONS[category][rating],
+                explanation=_explanation(category, rating, representative),
                 source_view=_source_view(representative.key if representative else None),
             )
         )
