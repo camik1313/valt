@@ -29,6 +29,7 @@ backend/scripts/*.MOV
 backend/scripts/*.jpg
 backend/scripts/*.jpeg
 backend/scripts/*.txt
+backend/scripts/annotated/
 
 # OS / editor junk
 .DS_Store
