@@ -41,6 +41,12 @@ RIGHT_ANKLE = 28
 LEFT_EYE = 2
 RIGHT_EYE = 5
 
+# A box height outside this range is measurement noise or a bad scale
+# estimate, not a box. The low end sits below a standard stair step
+# (~18cm); the high end sits well above the 31cm LESS box.
+MIN_PLAUSIBLE_BOX_CM = 10.0
+MAX_PLAUSIBLE_BOX_CM = 60.0
+
 
 @dataclass
 class ProtocolCheckResult:
@@ -175,12 +181,34 @@ def compute_protocol_check(
 
     delta_cm = None if landing_distance_cm is None else round(landing_distance_cm - target_cm, 1)
 
+    reported_box_height_cm: float | None = round(box_height_cm, 1)
     if box_height_cm <= 0:
         confident = False
         note = (
             f"Measured box height came out at {box_height_cm:.1f}cm, which isn't "
             "physically plausible (the box window wasn't clearly elevated above "
             "the ground window), so treat this measurement with caution."
+        )
+    elif box_height_cm < MIN_PLAUSIBLE_BOX_CM:
+        # A few cm of "height" is ankle-landmark jitter plus scale error, not
+        # a box. Reporting it as a measured 0.5 cm box (and calling it
+        # confident) would present noise as a result.
+        confident = False
+        reported_box_height_cm = None
+        note = (
+            "No raised box or step was detected: the ankles sat only "
+            f"{box_height_cm:.1f}cm higher in the box window than on the ground, "
+            "which is within normal measurement noise. If you did use a box, "
+            "make sure you're standing on it, with your whole body in frame, "
+            "during the 'step onto your box' phase."
+        )
+    elif box_height_cm > MAX_PLAUSIBLE_BOX_CM:
+        confident = False
+        reported_box_height_cm = None
+        note = (
+            f"The box height came out at {box_height_cm:.0f}cm, which is higher "
+            "than any real step or box you'd use here, so the scale estimate "
+            "or the calibration windows are probably off. Not reported."
         )
     else:
         confident = True
@@ -198,7 +226,7 @@ def compute_protocol_check(
             )
 
     return ProtocolCheckResult(
-        box_height_cm=round(box_height_cm, 1),
+        box_height_cm=reported_box_height_cm,
         landing_distance_cm=None if landing_distance_cm is None else round(landing_distance_cm, 1),
         landing_distance_target_cm=target_cm,
         landing_distance_delta_cm=delta_cm,

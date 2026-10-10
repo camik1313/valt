@@ -140,6 +140,7 @@ export default function CapturePage() {
   const [requiredAnswers, setRequiredAnswers] = useState<RequiredAnswers>({});
   const [pendingIncludeSecond, setPendingIncludeSecond] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [voiceOn, setVoiceOn] = useState(true); // spoken cues on/off
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   // Set when a session completes with only ONE view's measurements even
@@ -175,6 +176,9 @@ export default function CapturePage() {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  // Mirror of voiceOn for the timer callbacks below, which would otherwise
+  // close over a stale value from the render they were scheduled in.
+  const voiceOnRef = useRef(true);
   // Up to two recorded clips, indexed by clipIndex (0 = starting angle, 1 = opposite angle).
   const clipsRef = useRef<(RecordedClip | undefined)[]>([undefined, undefined]);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -186,6 +190,7 @@ export default function CapturePage() {
       timersRef.current.forEach(clearTimeout);
       clipsRef.current.forEach((c) => c && URL.revokeObjectURL(c.url));
       audioCtxRef.current?.close();
+      if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -236,6 +241,26 @@ export default function CapturePage() {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + durationMs / 1000 + 0.03);
+  }
+
+  // Spoken cue, using the browser's built-in speech (no audio files, no
+  // network, nothing recorded). Cancels whatever is still being said so cues
+  // never queue up behind each other and arrive late. The clip itself is
+  // recorded with audio: false, so spoken cues never end up in the video.
+  function speak(text: string) {
+    if (!voiceOnRef.current || typeof window === "undefined") return;
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    synth.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.05;
+    synth.speak(utterance);
+  }
+
+  function setVoice(next: boolean) {
+    voiceOnRef.current = next;
+    setVoiceOn(next);
+    if (!next && typeof window !== "undefined") window.speechSynthesis?.cancel();
   }
 
   // ---- Open the camera and show the live preview ----
@@ -294,6 +319,9 @@ export default function CapturePage() {
     if (!streamRef.current) return;
     setErrorMsg(null);
     ensureAudioContext(); // unlock audio now, inside this user-gesture click
+    // iOS only lets speech start from a user gesture, so the first spoken
+    // cue has to be issued here, inside the click that starts recording.
+    speak(`Get into position. Recording starts in ${POSITION_SECONDS} seconds.`);
 
     // Phase 1: give the athlete time to walk into frame. Not recording yet.
     setPhase("positioning");
@@ -328,6 +356,7 @@ export default function CapturePage() {
     // is also the ground-calibration window the backend uses to establish
     // real-world scale — see groundWindowSeconds in finish() below.
     setPhase("standing");
+    speak("Stand still.");
     runCountdown(STANDING_SECONDS, () => beginBoxStep());
   }
 
@@ -336,6 +365,7 @@ export default function CapturePage() {
   // boxWindowSeconds in finish() below.
   function beginBoxStep() {
     playBeep(988, 150); // "step up now"
+    speak("Step onto your box.");
     setPhase("box_step");
     runCountdown(BOX_STEP_SECONDS, () => beginJumpAndRebound());
   }
@@ -346,14 +376,17 @@ export default function CapturePage() {
   // NOT what's cued here — see the module docstring's "WHY REBOUND" note.
   function beginJumpAndRebound() {
     playBeep(1400, 250); // the "go" signal
+    speak("Jump!");
     setPhase("jump");
     timersRef.current.push(
       setTimeout(() => {
         playBeep(660, 150); // "you should be landing about now, jump again"
+        speak("Land, then jump again!");
         setPhase("rebound");
         timersRef.current.push(
           setTimeout(() => {
             playBeep(1046, 200); // done
+            speak("Done. Nice work.");
             recorderRef.current?.stop(); // triggers onstop -> review
           }, REBOUND_SECONDS * 1000)
         );
@@ -642,6 +675,7 @@ export default function CapturePage() {
             >
               Open camera
             </Button>
+            <VoiceToggle on={voiceOn} onChange={setVoice} />
             {heightCm === null && (
               <p className="mt-2 text-center text-xs text-muted">
                 Enter your height above to continue.
@@ -713,6 +747,7 @@ export default function CapturePage() {
             {phase === "ready" && (
               <>
                 <Button onClick={startRecording} variant="primary">Start recording</Button>
+                <VoiceToggle on={voiceOn} onChange={setVoice} />
                 {facing === "user" && (
                   <p className="text-center text-xs text-muted">
                     Front camera can mirror left/right in the video, so use the back
@@ -898,5 +933,21 @@ function Overlay({ label, big, tone = "track" }: { label: string; big: string; t
         {big}
       </span>
     </div>
+  );
+}
+
+// Small on/off switch for the spoken cues. Beeps always play; this only
+// controls the voice.
+function VoiceToggle({ on, onChange }: { on: boolean; onChange: (next: boolean) => void }) {
+  return (
+    <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 text-xs text-muted">
+      <input
+        type="checkbox"
+        checked={on}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 accent-track"
+      />
+      Spoken instructions
+    </label>
   );
 }

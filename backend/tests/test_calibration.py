@@ -9,6 +9,8 @@
 # MediaPipe, and hand-verify the math independently of the implementation.
 # ============================================================
 
+import pytest
+
 from app.cv import calibration
 
 L_ANKLE, R_ANKLE = 27, 28
@@ -76,6 +78,60 @@ def test_clean_sequence_measures_box_height_and_landing_distance():
         EXPECTED_LANDING_DISTANCE_CM - EXPECTED_TARGET_CM, 1
     )
     assert "42.5" in result.note
+
+
+def _sequence_with_box_ankle_y(box_ankle_y: float) -> list:
+    frames = []
+    for _ in range(30):
+        frames.append(_frame((0.5, GROUND_ANKLE_Y), eye_y=GROUND_EYE_Y))
+    for _ in range(30):
+        frames.append(_frame((BOX_ANKLE_X, box_ankle_y)))
+    for _ in range(10):
+        frames.append(_frame((BOX_ANKLE_X, 0.4)))
+    frames.append(_frame((LANDING_ANKLE_X, LANDING_ANKLE_Y)))
+    return frames
+
+
+def _check(per_frame):
+    return calibration.compute_protocol_check(
+        per_frame,
+        landing_frame=LANDING_FRAME,
+        athlete_height_cm=ATHLETE_HEIGHT_CM,
+        fps=FPS,
+        ground_window_seconds=GROUND_WINDOW_SECONDS,
+        box_window_seconds=BOX_WINDOW_SECONDS,
+    )
+
+
+def test_no_box_is_reported_as_no_box_not_a_confident_half_centimeter():
+    """Regression: a dry run with no box produced box_height 0.5cm marked
+    confident=True, i.e. noise presented as a measurement. Anything below
+    the plausibility floor must be unconfident and must not be reported
+    as a measured height."""
+    # 0.002 of frame height higher than the ground window = ~0.6cm at this scale.
+    result = _check(_sequence_with_box_ankle_y(GROUND_ANKLE_Y - 0.002))
+
+    assert result.confident is False
+    assert result.box_height_cm is None
+    assert "No raised box" in result.note
+
+
+def test_absurdly_tall_box_is_not_reported():
+    # 0.45 of frame height higher = ~127cm, i.e. a bad scale, not a box.
+    result = _check(_sequence_with_box_ankle_y(GROUND_ANKLE_Y - 0.45))
+
+    assert result.confident is False
+    assert result.box_height_cm is None
+
+
+def test_a_stair_step_height_is_accepted():
+    # ~18cm: a real stair step, comfortably above the noise floor.
+    step_cm = 18.0
+    y = GROUND_ANKLE_Y - step_cm * PX_PER_CM
+    result = _check(_sequence_with_box_ankle_y(y))
+
+    assert result.confident is True
+    assert result.box_height_cm == pytest.approx(step_cm, abs=0.2)
 
 
 def test_no_stable_box_window_degrades_without_raising():

@@ -23,6 +23,17 @@ import RecommendedExercisesCard from "@/components/exercises/RecommendedExercise
 import LandingProfileCard from "@/components/report/LandingProfileCard";
 import Button from "@/components/ui/Button";
 
+// The backend appends its pipeline diagnostics (frame numbers, detection
+// rates, calibration caveats) to the summary after a "Technical notes:"
+// paragraph. Worth keeping for anyone checking the work, but it shouldn't
+// sit in the middle of the plain-language summary.
+function splitSummary(text: string): { main: string; notes: string | null } {
+  const marker = "\n\nTechnical notes: ";
+  const at = text.indexOf(marker);
+  if (at === -1) return { main: text, notes: null };
+  return { main: text.slice(0, at), notes: text.slice(at + marker.length) };
+}
+
 export default function ReportPage({ params }: { params: { id: string } }) {
   // Three possible states while loading remote data.
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -75,6 +86,7 @@ export default function ReportPage({ params }: { params: { id: string } }) {
 
   // ---- Loaded: show the full report ----
   const created = new Date(analysis.createdAt).toLocaleString();
+  const summary = splitSummary(analysis.summary);
 
   return (
     <section className="mx-auto max-w-4xl px-6 py-16">
@@ -96,7 +108,13 @@ export default function ReportPage({ params }: { params: { id: string } }) {
         <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted">
           Summary
         </h2>
-        <p className="mt-2 whitespace-pre-line leading-relaxed text-ink">{analysis.summary}</p>
+        <p className="mt-2 whitespace-pre-line leading-relaxed text-ink">{summary.main}</p>
+        {summary.notes && (
+          <details className="mt-3 text-xs text-muted">
+            <summary className="cursor-pointer font-medium text-track">Technical details</summary>
+            <p className="mt-2 leading-relaxed">{summary.notes}</p>
+          </details>
+        )}
       </div>
 
       {/* Simple summary, before any raw numbers */}
