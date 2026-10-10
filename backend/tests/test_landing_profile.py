@@ -4,6 +4,8 @@
 # test_priorities.py uses, so each case isolates one behavior.
 # ============================================================
 
+import dataclasses
+
 from app.models.schemas import Metric
 from app.reports.landing_profile import compute_landing_profile
 from app.risk.less import LessItemScore
@@ -101,3 +103,34 @@ def test_inward_knee_motion_still_described_as_inward():
     profile = compute_landing_profile([_metric("knee_valgus_left", 0.4, "flag", "HW")], [])
     knee = next(c for c in profile.categories if c.category == "knee_control")
     assert "inward" in knee.explanation
+
+
+def test_less_driven_flag_does_not_claim_a_stiff_landing_next_to_a_deep_knee_bend():
+    # Regression from a real run: knee flexion 104 deg (status ok) but LESS
+    # displacement items flagged, so the generic "stiff landing, limited knee
+    # bend" sentence contradicted the number shown right beside it.
+    less = [_less_item("knee_flexion_displacement", points=1)]
+    less[0] = dataclasses.replace(less[0], label="Knee flexion displacement")
+    profile = compute_landing_profile([_metric("knee_flexion_left", 104.3, "ok")], less)
+
+    depth = next(c for c in profile.categories if c.category == "landing_depth")
+    assert depth.rating == "flag"
+    assert "stiff" not in depth.explanation
+    assert "limited knee bend" not in depth.explanation
+    assert "LESS" in depth.explanation
+    assert "knee flexion displacement" in depth.explanation
+    assert "uncertain" in depth.explanation
+
+
+def test_metric_driven_flag_keeps_the_plain_category_sentence():
+    profile = compute_landing_profile([_metric("knee_flexion_left", 30.0, "flag")], [])
+    depth = next(c for c in profile.categories if c.category == "landing_depth")
+    assert "stiff" in depth.explanation
+
+
+def test_upright_trunk_is_not_described_as_leaning():
+    profile = compute_landing_profile([_metric("trunk_lean_forward", 6.0, "watch")], [])
+    trunk = next(c for c in profile.categories if c.category == "trunk_control")
+    assert trunk.rating == "watch"
+    assert "upright" in trunk.explanation
+    assert "leaned" not in trunk.explanation

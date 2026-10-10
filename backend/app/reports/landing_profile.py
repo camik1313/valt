@@ -94,7 +94,36 @@ _KNEE_OUTWARD_EXPLANATIONS: dict[Rating, str] = {
 }
 
 
-def _explanation(category: str, rating: Rating, representative: Metric | None) -> str:
+def _explanation(
+    category: str,
+    rating: Rating,
+    representative: Metric | None,
+    flagged_less_labels: list[str],
+) -> str:
+    # The rating was driven by the LESS checklist, not by the measured value
+    # (the value itself looks fine, or there isn't one). The generic line for
+    # the category would then describe a problem the athlete's own number
+    # visibly contradicts, e.g. "stiff landing" next to a 104 degree knee bend.
+    # Say what actually flagged it, and be upfront that the two disagree.
+    metric_looks_fine = representative is None or representative.status == "ok"
+    if rating == "flag" and flagged_less_labels and metric_looks_fine:
+        shown = ", ".join(label.lower() for label in flagged_less_labels[:3])
+        text = f"The LESS checklist flagged: {shown}."
+        if representative is not None:
+            text += " The measured value itself looked typical, so treat this one as uncertain."
+        return text
+
+    # Forward lean is only ever a concern when it is too SMALL (see
+    # report_service._band), so the generic "leaned noticeably" sentence
+    # would describe the opposite of what was measured.
+    if (
+        category == "trunk_control"
+        and representative is not None
+        and representative.key == "trunk_lean_forward"
+        and representative.status in ("watch", "flag")
+    ):
+        return "Your trunk stayed quite upright during the landing, a stiffer pattern than folding forward into it."
+
     if (
         category == "knee_control"
         and rating in _KNEE_OUTWARD_EXPLANATIONS
@@ -187,7 +216,10 @@ def compute_landing_profile(
                 value=representative.value if representative else None,
                 unit=representative.unit if representative else None,
                 metric_label=representative.label if representative else None,
-                explanation=_explanation(category, rating, representative),
+                explanation=_explanation(
+                    category, rating, representative,
+                    [item.label for item in matching_less if item.points > 0],
+                ),
                 source_view=_source_view(representative.key if representative else None),
             )
         )

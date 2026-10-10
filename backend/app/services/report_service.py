@@ -87,7 +87,6 @@ THRESHOLDS = {
     "knee_valgus_right": (0.15, 0.25),
     "knee_valgus": (10, 15),
     "trunk_lean_lateral": (10, 15),
-    "trunk_lean_forward": (30, 45),
     "trunk_lean": (10, 15),
     "valgus_asymmetry": (25, 50),
     "flexion_asymmetry": (10, 15),
@@ -349,6 +348,16 @@ def _band(key: str, value: float) -> str:
         if deficit >= 8:
             return "watch"
         return "ok"
+
+    # Forward trunk lean is directional. In a landing the stiff pattern is an
+    # UPRIGHT trunk, and flexing forward is what the LESS wants, so the concern
+    # is too little lean, not a lot of it. The old placeholder band (watch at
+    # 30 deg, flag at 45) did the opposite and marked ordinary deep-squat
+    # landings (~40+ deg) as notable. This uses the same "not flexed" cutoff as
+    # LESS item 3 so the card and the checklist agree, and has no flag level
+    # because one operationalized cutoff does not support gradations.
+    if key == "trunk_lean_forward":
+        return "watch" if value <= less_scoring.HIP_TRUNK_FLEXED_MIN_DEG else "ok"
 
     if key in THRESHOLDS:
         watch_at, flag_at = THRESHOLDS[key]

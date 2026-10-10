@@ -404,3 +404,25 @@ def test_landing_profile_none_on_mock_fallback():
         video_path=None,
     )
     assert analysis.landing_profile is None
+
+
+# ---- Forward trunk lean banding ----
+
+def test_deep_forward_trunk_lean_is_not_flagged():
+    """Regression: a 43 deg forward lean (a normal deep squat landing, and
+    what the LESS actually wants) used to band as notable."""
+    assert report_service._band("trunk_lean_forward", 43.4) == "ok"
+    assert report_service._band("trunk_lean_forward", 60.0) == "ok"
+
+
+def test_upright_trunk_is_the_forward_lean_concern():
+    # Same cutoff as LESS item 3's "not flexed": at or below 10 deg.
+    assert report_service._band("trunk_lean_forward", 5.0) == "watch"
+    assert report_service._band("trunk_lean_forward", 10.0) == "watch"
+    assert report_service._band("trunk_lean_forward", 10.1) == "ok"
+
+
+def test_lateral_trunk_lean_still_flags_in_either_direction_of_magnitude():
+    assert report_service._band("trunk_lean_lateral", 12.0) == "watch"
+    assert report_service._band("trunk_lean_lateral", 20.0) == "flag"
+    assert report_service._band("trunk_lean_lateral", 3.0) == "ok"
