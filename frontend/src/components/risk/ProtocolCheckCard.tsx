@@ -41,14 +41,14 @@ export default function ProtocolCheckCard({
           <h2 className="font-display text-sm font-semibold uppercase tracking-wide text-muted">
             Box-jump protocol check
           </h2>
-          <p className="text-[11px] text-muted">Measured from your video, not self-reported</p>
+          <p className="text-[11px] text-muted">Estimated from your video, not self-reported</p>
         </div>
         <span
           className={`rounded-full px-3 py-1 text-xs font-semibold ${
             confident ? "bg-track-soft text-track" : "bg-watch-soft text-watch"
           }`}
         >
-          {confident ? "Measured" : "Uncertain"}
+          {confident ? "Estimate" : "Uncertain"}
         </span>
       </div>
 

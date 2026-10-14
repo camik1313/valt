@@ -303,10 +303,9 @@ def _merge_protocol_checks(
     Combine calibration from up to two clips into one result. Landing
     distance is far more reliable from a SIDE-ON camera (a front-on view
     foreshortens forward motion toward the lens), so when both clips give
-    a confident reading, prefer the side-view clip's landing-distance
-    figure; box height is equally visible from either angle, so just take
-    whichever clip resolved it. Falls back to whichever single result is
-    confident, or None if neither is.
+    a confident reading, take both figures from the side-view clip and
+    describe those same numbers in the note. Falls back to whichever
+    single result is confident, or None if neither is.
     """
     if primary is None:
         return side
@@ -322,19 +321,34 @@ def _merge_protocol_checks(
     if not side.confident:
         return primary
 
-    # Both confident: prefer side-view landing distance, either view's box
-    # height (arbitrarily the side clip's, for a single consistent source).
-    side_is_landing_source = side_view == "side"
-    landing_source = side if side_is_landing_source else primary
+    # Both confident. Take BOTH numbers from the side-view clip: forward
+    # travel is only visible across the frame from the side, and stepping up
+    # toward a front-facing camera hides part of the rise (box height read
+    # 9 to 14 cm on a front clip vs ~24 cm from the side on an 18 cm stair).
+    # `side` here just means "the second clip recorded", so decide which clip
+    # is actually the side view rather than assuming.
+    if side_view == "side":
+        side_clip, other_clip, other_view = side, primary, primary_view
+    elif primary_view == "side":
+        side_clip, other_clip, other_view = primary, side, side_view
+    else:
+        side_clip, other_clip, other_view = primary, side, side_view
+
+    note = side_clip.note
+    a, b = side_clip.box_height_cm, other_clip.box_height_cm
+    if a is not None and b is not None and max(a, b) > 0 and abs(a - b) / max(a, b) > 0.3:
+        note += (
+            f" The {other_view}-view clip estimated {b:.1f}cm instead; the "
+            "side view is used because a front-facing camera loses part of "
+            "the step height when you move toward it."
+        )
     return calibration.ProtocolCheckResult(
-        box_height_cm=side.box_height_cm,
-        landing_distance_cm=landing_source.landing_distance_cm,
-        landing_distance_target_cm=landing_source.landing_distance_target_cm,
-        landing_distance_delta_cm=landing_source.landing_distance_delta_cm,
+        box_height_cm=side_clip.box_height_cm,
+        landing_distance_cm=side_clip.landing_distance_cm,
+        landing_distance_target_cm=side_clip.landing_distance_target_cm,
+        landing_distance_delta_cm=side_clip.landing_distance_delta_cm,
         confident=True,
-        note=(
-            f"{primary.note} Also measured from the {side_view} clip: {side.note}"
-        ),
+        note=note,
     )
 
 

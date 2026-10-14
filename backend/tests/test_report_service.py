@@ -426,3 +426,48 @@ def test_lateral_trunk_lean_still_flags_in_either_direction_of_magnitude():
     assert report_service._band("trunk_lean_lateral", 12.0) == "watch"
     assert report_service._band("trunk_lean_lateral", 20.0) == "flag"
     assert report_service._band("trunk_lean_lateral", 3.0) == "ok"
+
+
+# ---- Protocol-check merge across two clips ----
+
+def _pc(box, dist, note, confident=True):
+    from app.cv.calibration import ProtocolCheckResult
+    return ProtocolCheckResult(
+        box_height_cm=box, landing_distance_cm=dist, landing_distance_target_cm=83.8,
+        landing_distance_delta_cm=None if dist is None else round(dist - 83.8, 1),
+        confident=confident, note=note,
+    )
+
+
+def test_merge_takes_both_numbers_from_the_side_clip_and_note_matches():
+    """Regression from a real session: the headline said 23.8cm / 70.2cm but
+    the sentence under it led with the front clip's 13.6cm / 14.7cm."""
+    front = _pc(13.6, 14.7, "Box height measured at 13.6cm. Landing distance measured at 14.7cm.")
+    side = _pc(23.8, 70.2, "Box height measured at 23.8cm. Landing distance measured at 70.2cm.")
+
+    merged = report_service._merge_protocol_checks(front, side, primary_view="front", side_view="side")
+
+    assert merged.box_height_cm == 23.8
+    assert merged.landing_distance_cm == 70.2
+    assert "23.8" in merged.note and "70.2" in merged.note
+    assert not merged.note.startswith("Box height measured at 13.6")
+    assert "13.6" in merged.note  # the disagreement is disclosed, not hidden
+
+
+def test_merge_uses_the_side_clip_even_when_it_was_recorded_first():
+    """The old code always took box height from the SECOND clip, so a
+    side-then-front session used the front clip's (under-reading) value."""
+    side_first = _pc(24.0, 65.0, "Box height measured at 24.0cm. Landing distance measured at 65.0cm.")
+    front_second = _pc(9.9, 12.0, "Box height measured at 9.9cm. Landing distance measured at 12.0cm.")
+
+    merged = report_service._merge_protocol_checks(side_first, front_second, primary_view="side", side_view="front")
+
+    assert merged.box_height_cm == 24.0
+    assert merged.landing_distance_cm == 65.0
+
+
+def test_merge_does_not_mention_a_disagreement_when_clips_agree():
+    a = _pc(22.0, 60.0, "Box height measured at 22.0cm.")
+    b = _pc(23.0, 61.0, "Box height measured at 23.0cm.")
+    merged = report_service._merge_protocol_checks(a, b, primary_view="front", side_view="side")
+    assert "instead" not in merged.note

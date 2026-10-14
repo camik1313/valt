@@ -215,9 +215,9 @@ def compute_protocol_check(
         note = (
             f"Box height measured at {box_height_cm:.1f}cm (the LESS standard is "
             "31cm/12in). Scale is estimated from ankle-to-eye-level against "
-            "self-reported height, since MediaPipe has no top-of-head landmark, "
-            "which runs a few percent high relative to true standing height — "
-            "treat these figures as approximate, not lab-precise."
+            "self-reported height, since MediaPipe has no top-of-head landmark. "
+            "These are rough estimates, not lab measurements: in testing, a "
+            "known 18cm step read about a third too high."
         )
         if landing_distance_cm is not None:
             note += (
